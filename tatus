@@ -1,0 +1,25 @@
+warning: in the working copy of 'App.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/App.tsx b/App.tsx[m
+[1mnew file mode 100644[m
+[1mindex 0000000..71c5782[m
+[1m--- /dev/null[m
+[1m+++ b/App.tsx[m
+[36m@@ -0,0 +1,18 @@[m
+[32m+[m[32mimport './src/suppressWarnings';[m
+[32m+[m[32mimport React from 'react';[m
+[32m+[m[32mimport { SafeAreaProvider } from 'react-native-safe-area-context';[m
+[32m+[m[32mimport { StatusBar } from 'expo-status-bar';[m
+[32m+[m[32mimport RootNavigator from './src/navigation/RootNavigator';[m
+[32m+[m[32mimport ErrorBoundary from './src/components/ErrorBoundary';[m
+[32m+[m[32mimport './src/i18n';[m
+[32m+[m
+[32m+[m[32mexport default function App() {[m
+[32m+[m[32m  return ([m
+[32m+[m[32m    <ErrorBoundary>[m
+[32m+[m[32m      <SafeAreaProvider>[m
+[32m+[m[32m        <StatusBar style="auto" />[m
+[32m+[m[32m        <RootNavigator />[m
+[32m+[m[32m      </SafeAreaProvider>[m
+[32m+[m[32m    </ErrorBoundary>[m
+[32m+[m[32m  );[m
+[32m+[m[32m}[m

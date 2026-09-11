@@ -1,0 +1,268 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users Profile
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Deleted Accounts
+    match /deleted_accounts/{phone} {
+      allow read, write: if true;
+    }
+    
+    // Jobs
+    match /jobs/{jobId} {
+      allow read, write: if true;
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read, write: if true;
+    }
+
+    // Services
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Vendors/Businesses
+    match /vendors/{vendorId} {
+      allow read: if true;
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid || 
+        request.resource.data.ownerId == request.auth.uid || 
+        request.auth.token.role == "admin"
+      );
+      allow update, delete: if request.auth != null && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.ownerId == request.auth.uid || 
+        request.auth.token.role == "admin"
+      );
+    }
+
+    // Payments History
+    match /payments/{paymentId} {
+      allow read: if request.auth != null && (
+        resource.data.vendorId == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        request.auth.token.role == "admin" ||
+        (exists(/databases/$(database)/documents/vendors/$(resource.data.vendorId)) && (
+          get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.ownerId == request.auth.uid
+        ))
+      );
+      allow write: if request.auth != null && (
+        request.resource.data.vendorId == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid || 
+        request.auth.token.role == "admin" ||
+        (exists(/databases/$(database)/documents/vendors/$(request.resource.data.vendorId)) && (
+          get(/databases/$(database)/documents/vendors/$(request.resource.data.vendorId)).data.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/vendors/$(request.resource.data.vendorId)).data.ownerId == request.auth.uid
+        ))
+      );
+    }
+
+    // Ad Banners & Promos
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.role == "admin";
+    }
+
+    // Pincode Ads
+    match /pincode_ads/{adId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+      allow write: if request.auth != null && (request.resource.data.userId == request.auth.uid || request.auth.token.role == "admin");
+    }
+
+    // Providers
+    match /providers/{providerId} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        providerId == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid || 
+        request.auth.token.role == "admin"
+      );
+    }
+
+    // Subscription Plans
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.role == "admin";
+    }
+
+    // Vendor Subscriptions
+    match /vendorSubscriptions/{vendorId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role == "admin" ||
+        resource == null ||
+        get(/databases/$(database)/documents/vendors/$(vendorId)).data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/vendors/$(vendorId)).data.ownerId == request.auth.uid
+      );
+      allow write: if request.auth != null && (
+        request.auth.token.role == "admin" ||
+        get(/databases/$(database)/documents/vendors/$(vendorId)).data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/vendors/$(vendorId)).data.ownerId == request.auth.uid
+      );
+    }
+
+    // Vendor Monthly Metrics
+    match /vendorMonthlyMetrics/{metricId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role == "admin" ||
+        resource == null ||
+        get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.ownerId == request.auth.uid
+      );
+      allow write: if false;
+    }
+
+    // Transactions Ledger
+    match /transactions/{transactionId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role == "admin" ||
+        resource == null ||
+        get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.ownerId == request.auth.uid
+      );
+      allow create: if request.auth != null && (
+        request.auth.token.role == "admin" ||
+        get(/databases/$(database)/documents/vendors/$(request.resource.data.vendorId)).data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/vendors/$(request.resource.data.vendorId)).data.ownerId == request.auth.uid
+      );
+      allow update, delete: if false;
+    }
+
+    // Brands
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.role == "admin";
+    }
+
+    // Categories (Services, Industrial Mart, Jobs)
+    match /cat_services/{catId} {
+      allow read, write: if true;
+    }
+    match /cat_industrial/{catId} {
+      allow read, write: if true;
+    }
+    match /cat_jobs/{catId} {
+      allow read, write: if true;
+    }
+
+    // Leads
+    match /leads/{leadId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role == "admin" ||
+        resource == null ||
+        resource.data.userId == request.auth.uid ||
+        (exists(/databases/$(database)/documents/vendors/$(resource.data.vendorId)) && (
+          get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/vendors/$(resource.data.vendorId)).data.ownerId == request.auth.uid
+        ))
+      );
+      allow write: if request.auth != null;
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.reviewerId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.reviewerId == request.auth.uid;
+    }
+
+    // Job Applications
+    match /job_applications/{appId} {
+      allow read: if request.auth != null && (
+        resource == null || 
+        resource.data.userId == request.auth.uid || 
+        get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.postedBy == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && (
+        resource.data.userId == request.auth.uid || 
+        get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.postedBy == request.auth.uid
+      );
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Resumes
+    match /resumes/{resumeId} {
+      allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid || request.auth.token.role == "admin");
+      allow write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resumeId == request.auth.uid);
+    }
+
+    // Saved Jobs
+    match /saved_jobs/{jobId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid);
+    }
+
+    // Favorite Jobs
+    match /favorite_jobs/{jobId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid);
+    }
+
+    // Support Chats
+    match /support_chats/{chatId} {
+      allow read: if request.auth != null && (chatId == request.auth.uid || request.auth.token.role == "admin");
+      allow write: if request.auth != null && (chatId == request.auth.uid || request.auth.token.role == "admin");
+      match /messages/{msgId} {
+        allow read: if request.auth != null && (chatId == request.auth.uid || request.auth.token.role == "admin");
+        allow create: if request.auth != null && (chatId == request.auth.uid || request.auth.token.role == "admin") && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // Minimal Admin-User Support Chat
+    match /chats/{chatId} {
+      // Helper: true when the caller is an admin
+      function isAdmin() {
+        return request.auth != null && request.auth.token.role == "admin";
+      }
+      // Helper: true when this chatId belongs to the calling user
+      function isOwner() {
+        return request.auth != null && chatId == 'admin_' + request.auth.uid;
+      }
+
+      // Collection-safe read: use chatId pattern (no resource.data) so list queries
+      // work correctly for both owners and admins
+      allow read: if isAdmin() || isOwner();
+
+      allow create: if request.auth != null && (isOwner() || isAdmin());
+
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (
+          isOwner() &&
+          (
+            request.resource.data.status == resource.data.status ||
+            (resource.data.status == 'closed' && request.resource.data.status == 'open')
+          )
+        )
+      );
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isAdmin() || isOwner();
+        allow create: if request.auth != null &&
+          (isOwner() || isAdmin()) &&
+          request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // Config collection (pricing, app config)
+    match /config/{configId} {
+      allow read, write: if true;
+    }
+  }
+}
