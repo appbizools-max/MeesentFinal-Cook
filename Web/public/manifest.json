@@ -1,0 +1,9 @@
+{
+  "short_name": "Messent Admin",
+  "name": "Messent App Admin Panel",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#bc36ad",
+  "background_color": "#ffffff"
+}

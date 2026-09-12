@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Meesent",
+    "scheme": "meesent",
+    "slug": "meesent-app",
+    "version": "1.1.3",
+    "orientation": "portrait",
+    "icon": "./assets/App Icon All.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/Meesent App logo .png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.messent.app",
+      "buildNumber": "1.1.3",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow Meesent to access your photos to upload profile pictures and service images.",
+        "NSCameraUsageDescription": "Allow Meesent to use your camera to take photos for your profile and services.",
+        "NSLocationWhenInUseUsageDescription": "Allow Meesent to access your location to find nearby services."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/App Icon All.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.messent.app",
+      "versionCode": 14,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "expo-localization"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "be5a6ee4-c22f-470f-b5c5-b672182f4332"
+      }
+    },
+    "owner": "preetham.avala"
+  }
+}
