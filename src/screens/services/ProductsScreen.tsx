@@ -229,7 +229,7 @@ export default function ProductsScreen({ route, navigation }: any) {
                 <Text style={styles.trustedBadgeText}>Trusted</Text>
               </View>
             )}
-            {item.tookVerification && (
+            {(item.tookVerification || item.isVerified || item.verifyMark || item.verificationStatus === 'verified') && (
               <View style={styles.verifiedBadge}>
                 <Ionicons name="checkmark-circle" size={10} color="#15803d" style={{ marginRight: 2 }} />
                 <Text style={styles.verifiedBadgeText}>Verified</Text>

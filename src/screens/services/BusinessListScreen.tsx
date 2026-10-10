@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, increment } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
+import leadService from '../../services/lead.service';
 import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
 import { getNearbyVendors } from '../../services/geofire';
@@ -215,64 +216,17 @@ export default function BusinessListScreen({ route, navigation }: any) {
     }
   };
 
-  const logLead = async (item: any, type: 'call' | 'whatsapp' | 'direction') => {
-    try {
-      const currentUser = auth.currentUser;
-      const vendorId = item.id || item.vendorId;
-      let userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Guest User';
-      let userPhone = currentUser?.phoneNumber || '';
-
-      if (currentUser) {
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          if (userData.name) userName = userData.name;
-          if (userData.phoneNumber) userPhone = userData.phoneNumber;
-        }
-      }
-
-      await addDoc(collection(db, 'leads'), {
-        vendorId: vendorId || 'unknown',
-        vendorName: item.businessName || 'Business',
-        userId: currentUser?.uid || 'guest',
-        userName,
-        userPhone,
-        type,
-        createdAt: new Date().toISOString(),
-      });
-
-      if (vendorId) {
-        const updateData: any = {};
-        if (type === 'call') {
-          updateData.callsCount = increment(1);
-          updateData.calls = increment(1);
-        } else if (type === 'whatsapp') {
-          updateData.whatsappCount = increment(1);
-          updateData.whatsapp = increment(1);
-        } else if (type === 'direction') {
-          updateData.directionsCount = increment(1);
-          updateData.directions = increment(1);
-        }
-        await updateDoc(doc(db, 'vendors', vendorId), updateData);
-      }
-    } catch (error) {
-      console.error('Error logging lead: ', error);
-    }
-  };
-
   const handleCall = (item: any) => {
-    logLead(item, 'call');
+    leadService.recordCall(item);
     Linking.openURL(`tel:${item.phone}`);
   };
 
   const handleWhatsApp = (item: any) => {
-    logLead(item, 'whatsapp');
+    leadService.recordWhatsApp(item);
     Linking.openURL(`whatsapp://send?phone=${item.phone}`);
   };
 
   const handleMapRedirect = (item?: any) => {
-    if (item) logLead(item, 'direction');
     const defaultQuery = item?.businessName || item?.location || safeSubCategory || safeCategory || 'Businesses';
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(defaultQuery)}`);
   };
@@ -487,7 +441,7 @@ export default function BusinessListScreen({ route, navigation }: any) {
                         <Text style={styles.topRatedBadgeText}>Top Rated</Text>
                       </View>
                     )}
-                    {item.tookVerification && (
+                    {(item.tookVerification || item.isVerified || item.verifyMark || item.verificationStatus === 'verified') && (
                       <View style={styles.verifiedBadge}>
                         <Ionicons name="checkmark-circle" size={10} color="#1e40af" style={{ marginRight: 2 }} />
                         <Text style={styles.verifiedBadgeText}>Verified</Text>

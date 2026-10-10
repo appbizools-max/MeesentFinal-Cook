@@ -75,6 +75,7 @@ export const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           path: '/vendors',
           subItems: [
             { name: 'Manage Vendors', path: '/vendors' },
+            { name: 'Leads & Guarantees', path: '/vendors/leads' },
             { name: 'Vendor Analytics & Calls', path: '/vendors/analytics' },
             ...(!isEmployee ? [{ name: 'Vendor Transactions', path: '/vendors/transactions' }] : []),
           ]

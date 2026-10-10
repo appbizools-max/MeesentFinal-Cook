@@ -170,6 +170,42 @@ export const Vendors = () => {
     }
   };
 
+  const toggleServicesVerification = async (vendor) => {
+    try {
+      const isCurrentlyVerified = Boolean(
+        vendor.isVerified ||
+        vendor.tookVerification ||
+        vendor.verifyMark ||
+        vendor.verificationStatus === 'verified'
+      );
+      const nextState = !isCurrentlyVerified;
+
+      await updateDoc(doc(db, 'vendors', vendor.id), {
+        isVerified: nextState,
+        tookVerification: nextState,
+        verifyMark: nextState,
+        verificationStatus: nextState ? 'verified' : 'unverified',
+        verificationBadgePurchasedAt: nextState ? new Date().toISOString() : null,
+        updatedAt: serverTimestamp()
+      });
+
+      const ownerId = vendor.userId || vendor.ownerId;
+      if (ownerId && nextState) {
+        try {
+          await updateDoc(doc(db, 'users', ownerId), {
+            hasVerificationBadge: true,
+            isVerified: true
+          });
+        } catch (_) {}
+      }
+
+      toast.success(nextState ? `Services Verification granted to "${vendor.businessName}"` : `Services Verification revoked for "${vendor.businessName}"`);
+    } catch (error) {
+      console.error("Error toggling verification:", error);
+      toast.error('Failed to toggle verification');
+    }
+  };
+
   const handleDeleteVendor = async (vendorId, businessName) => {
     if (window.confirm(`Are you sure you want to permanently delete "${businessName || 'this vendor'}"?`)) {
       try {
@@ -494,6 +530,23 @@ export const Vendors = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end space-x-2">
+                        {/* Toggle Services Verification Badge */}
+                        <button
+                          onClick={() => toggleServicesVerification(vendor)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            vendor.isVerified || vendor.tookVerification || vendor.verifyMark || vendor.verificationStatus === 'verified'
+                              ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 ring-1 ring-emerald-300'
+                              : 'text-slate-400 hover:text-emerald-600 hover:bg-slate-100'
+                          }`}
+                          title={
+                            vendor.isVerified || vendor.tookVerification || vendor.verifyMark || vendor.verificationStatus === 'verified'
+                              ? "Services Verification Active (Click to revoke)"
+                              : "Click to grant Services Verification"
+                          }
+                        >
+                          <ShieldCheck className="w-5 h-5" />
+                        </button>
+
                         {/* Approve Action: Show if not already approved/active */}
                         {vendor.status !== 'approved' && vendor.status !== 'active' && (
                           <button
@@ -794,12 +847,40 @@ export const Vendors = () => {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end space-x-3">
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end items-center space-x-3">
               <button
                 onClick={() => setShowViewModal(false)}
                 className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-100 transition-colors"
               >
                 Close
+              </button>
+              <button
+                onClick={() => {
+                  toggleServicesVerification(selectedVendor);
+                  const isCurrent = Boolean(
+                    selectedVendor.isVerified ||
+                    selectedVendor.tookVerification ||
+                    selectedVendor.verifyMark ||
+                    selectedVendor.verificationStatus === 'verified'
+                  );
+                  setSelectedVendor(prev => ({
+                    ...prev,
+                    isVerified: !isCurrent,
+                    tookVerification: !isCurrent,
+                    verifyMark: !isCurrent,
+                    verificationStatus: !isCurrent ? 'verified' : 'unverified'
+                  }));
+                }}
+                className={`px-5 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-1.5 shadow-sm ${
+                  selectedVendor.isVerified || selectedVendor.tookVerification || selectedVendor.verifyMark || selectedVendor.verificationStatus === 'verified'
+                    ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                {selectedVendor.isVerified || selectedVendor.tookVerification || selectedVendor.verifyMark || selectedVendor.verificationStatus === 'verified'
+                  ? 'Revoke Services Verification'
+                  : 'Grant Services Verification'}
               </button>
               {selectedVendor.status === 'pending_approval' && (
                 <button

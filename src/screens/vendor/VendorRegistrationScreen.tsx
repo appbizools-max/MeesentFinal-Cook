@@ -18,7 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { auth, db, storage } from '../../services/firebase';
-import { doc, setDoc, updateDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { geohashForLocation } from '../../services/geofire';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Toast from 'react-native-toast-message';

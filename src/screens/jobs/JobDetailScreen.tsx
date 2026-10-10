@@ -804,7 +804,14 @@ const JobDetailScreen = () => {
             {/* Company Info */}
             <View style={styles.companyRow}>
               <Text style={styles.companyNameText}>{job.company || "TechNova Solutions"}</Text>
-              <MaterialCommunityIcons name="check-decagram" size={16} color="#2563EB" style={{ marginLeft: 4 }} />
+              {(job.isGenuineVerified || job.hasVerificationBadge || job.isVerified || job.verificationStatus === 'verified') ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ecfdf5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#a7f3d0', marginLeft: 6 }}>
+                  <Ionicons name="shield-checkmark" size={12} color="#059669" style={{ marginRight: 3 }} />
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#059669', letterSpacing: 0.5 }}>GENUINE VERIFIED</Text>
+                </View>
+              ) : (
+                <MaterialCommunityIcons name="check-decagram" size={16} color="#94a3b8" style={{ marginLeft: 4 }} />
+              )}
             </View>
           </View>
 

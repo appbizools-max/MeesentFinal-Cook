@@ -459,13 +459,19 @@ export default function PostJobScreen({ navigation }: any) {
           const userSnap = await getDoc(doc(db, 'users', userId));
           if (userSnap.exists()) {
             const userData = userSnap.data();
-            if (userData.isGenuineVerified) {
-              const end = userData.genuineVerificationEndDate?.toDate
-                ? userData.genuineVerificationEndDate.toDate()
-                : new Date(userData.genuineVerificationEndDate || 0);
-              if (end > new Date()) {
+            if (userData.isGenuineVerified || userData.hasVerificationBadge || userData.isVerified || userData.verificationStatus === 'verified') {
+              if (!userData.genuineVerificationEndDate) {
+                // Lifetime / admin-granted verification without expiry
                 isUserGenuine = true;
-                genuineEndDate = userData.genuineVerificationEndDate;
+                genuineEndDate = null;
+              } else {
+                const end = userData.genuineVerificationEndDate?.toDate
+                  ? userData.genuineVerificationEndDate.toDate()
+                  : new Date(userData.genuineVerificationEndDate);
+                if (isNaN(end.getTime()) || end > new Date()) {
+                  isUserGenuine = true;
+                  genuineEndDate = userData.genuineVerificationEndDate;
+                }
               }
             }
           }

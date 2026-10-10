@@ -14,6 +14,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { useTranslation } from 'react-i18next';
+import Constants from 'expo-constants';
 
 const { width } = Dimensions.get('window');
 
@@ -194,7 +195,7 @@ export default function ServicesSidebar({ visible, onClose, navigation }: Sideba
             </ScrollView>
 
             <View style={styles.footer}>
-              <Text style={styles.versionText}>{t('sidebar.version')} 1.0.0</Text>
+              <Text style={styles.versionText}>{t('sidebar.version')} {Constants.expoConfig?.version || '1.1.8'}</Text>
               <Text style={styles.footerBrand}>Messent Services</Text>
             </View>
           </SafeAreaView>

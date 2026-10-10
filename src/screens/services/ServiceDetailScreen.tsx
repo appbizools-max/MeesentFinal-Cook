@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, addDoc, query, where, onSnapshot, getDocs, updateDoc, doc, getDoc, increment } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
+import leadService from '../../services/lead.service';
 
 const { width } = Dimensions.get('window');
 
@@ -62,104 +63,10 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
   }, [service.id]);
 
   useEffect(() => {
-    const logProfileView = async () => {
-      try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
-
-        // Make exception: if the vendor owner views their own profile, do not count
-        const vendorOwnerId = displayService.ownerId || displayService.userId;
-        if (currentUser.uid === vendorOwnerId) {
-          console.log("Visitor is the vendor owner themselves, skipping lead log.");
-          return;
-        }
-
-        // Check if we logged a view lead in the last 1 hour
-        const oneHourAgo = new Date();
-        oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-        let recentView = false;
-
-        try {
-          const q = query(
-            collection(db, 'leads'),
-            where('vendorId', '==', displayService.id || service.id),
-            where('userId', '==', currentUser.uid),
-            where('type', '==', 'view')
-          );
-          const querySnap = await getDocs(q);
-          querySnap.forEach(docSnap => {
-            const data = docSnap.data();
-            const viewTime = new Date(data.createdAt);
-            if (viewTime > oneHourAgo) {
-              recentView = true;
-            }
-          });
-        } catch (queryErr) {
-          // If query fails due to rule constraints, log warning and proceed to add lead if possible
-          console.warn("Could not query existing view leads:", queryErr);
-        }
-
-        if (recentView) {
-          console.log("Profile view lead logged recently, skipping.");
-          return;
-        }
-
-        // Fetch viewer's user profile details
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        let userName = currentUser.displayName || currentUser.email?.split('@')[0] || 'Guest User';
-        let userPhone = currentUser.phoneNumber || '';
-
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          if (userData.name) userName = userData.name;
-          if (userData.phoneNumber) userPhone = userData.phoneNumber;
-        }
-
-        await addDoc(collection(db, 'leads'), {
-          vendorId: displayService.id || service.id,
-          vendorName: displayService.businessName || service.businessName,
-          vendorOwnerId: displayService.ownerId || displayService.userId || service.ownerId || service.userId || '',
-          userId: currentUser.uid,
-          userName,
-          userPhone,
-          type: 'view',
-          createdAt: new Date().toISOString(),
-        });
-
-        const targetVendorDocId = displayService.id || service.id;
-        if (targetVendorDocId) {
-          updateDoc(doc(db, 'vendors', targetVendorDocId), {
-            viewsCount: increment(1),
-            views: increment(1)
-          }).catch(err => console.log('Error incrementing view count:', err));
-        }
-
-        // Send notification to the VENDOR OWNER (not the visitor)
-        const targetVendorOwnerId = vendorOwnerId || service.ownerId || service.userId;
-        if (targetVendorOwnerId && targetVendorOwnerId !== currentUser.uid) {
-          try {
-            await addDoc(collection(db, 'notifications'), {
-              userId: targetVendorOwnerId,
-              title: 'New Profile Visitor 👀',
-              message: `${userName} just viewed your business profile "${displayService.businessName || service.businessName}". Check details in My Leads!`,
-              type: 'profile_view',
-              read: false,
-              createdAt: new Date().toISOString(),
-            });
-          } catch (notifErr) {
-            console.warn('Could not save visitor notification for vendor owner:', notifErr);
-          }
-        }
-      } catch (error) {
-        console.warn('Silent note: Profile view lead log skipped:', error);
-      }
-    };
-
     if (displayService && (displayService.id || service.id)) {
-      logProfileView();
+      leadService.recordProfileView(displayService);
     }
-  }, [displayService.id, service.id]);
+  }, [displayService?.id, service?.id]);
 
   useEffect(() => {
     // Query reviews for this vendor/service ID globally
@@ -182,64 +89,17 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
     return () => unsubscribe();
   }, [service.id]);
 
-  const logLead = async (type: 'call' | 'whatsapp' | 'direction') => {
-    try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) return;
-
-      const userRef = doc(db, 'users', currentUser.uid);
-      const userSnap = await getDoc(userRef);
-      let userName = currentUser.displayName || currentUser.email?.split('@')[0] || 'Guest User';
-      let userPhone = currentUser.phoneNumber || '';
-
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (userData.name) userName = userData.name;
-        if (userData.phoneNumber) userPhone = userData.phoneNumber;
-      }
-
-      const targetVendorId = displayService.id || service.id;
-
-      await addDoc(collection(db, 'leads'), {
-        vendorId: targetVendorId,
-        vendorName: displayService.businessName || service.businessName,
-        userId: currentUser.uid,
-        userName,
-        userPhone,
-        type,
-        createdAt: new Date().toISOString(),
-      });
-
-      if (targetVendorId) {
-        const updateData: any = {};
-        if (type === 'call') {
-          updateData.callsCount = increment(1);
-          updateData.calls = increment(1);
-        } else if (type === 'whatsapp') {
-          updateData.whatsappCount = increment(1);
-          updateData.whatsapp = increment(1);
-        } else if (type === 'direction') {
-          updateData.directionsCount = increment(1);
-          updateData.directions = increment(1);
-        }
-        await updateDoc(doc(db, 'vendors', targetVendorId), updateData);
-      }
-    } catch (error) {
-      console.error('Error logging lead: ', error);
-    }
-  };
-
   const handleCall = () => {
-    logLead('call');
+    leadService.recordCall(displayService);
     Linking.openURL(`tel:${service.phone}`);
   };
+
   const handleWhatsApp = () => {
-    logLead('whatsapp');
+    leadService.recordWhatsApp(displayService);
     Linking.openURL(`whatsapp://send?phone=${service.phone}`);
   };
 
   const handleDirections = () => {
-    logLead('direction');
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(service.location)}`;
     Linking.openURL(mapsUrl);
   };
@@ -251,7 +111,7 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
     }
     try {
       const authorName = auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Guest User';
-      
+
       // 1. Add review doc
       await addDoc(collection(db, 'reviews'), {
         vendorId: service.id,
@@ -322,7 +182,7 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
 
           <View style={styles.titleOverlay}>
             <View style={styles.badgeRow}>
-              {service.tookVerification && (
+              {(service.tookVerification || service.isVerified || service.verifyMark || service.verificationStatus === 'verified' || service.status === 'verified') && (
                 <View style={styles.genuinePill}>
                   <Ionicons name="shield-checkmark" size={10} color="white" />
                   <Text style={styles.genuinePillText}>Genuine Verified</Text>
@@ -402,7 +262,7 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
             <>
               {/* Quick Details Desk - Compact & Modern Card */}
               <View style={styles.compactDeskCard}>
-                
+
                 {/* 1. Address Section */}
                 <View style={styles.deskRow}>
                   <View style={[styles.deskIconWrapper, { backgroundColor: '#eff6ff' }]}>
@@ -509,148 +369,148 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
             </>
           )}
 
-        {activeTab === (displayService.type === 'product' ? t('service_detail.featured_products') : t('service_detail.featured_services')) && (
-          <View style={styles.cardSection}>
-            <Text style={styles.cardTitle}>{displayService.type === 'product' ? t('service_detail.featured_products') : t('service_detail.featured_services')}</Text>
-            {(!displayService.catalog || displayService.catalog.length === 0) ? (
-              <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', marginVertical: 20 }}>
-                {displayService.type === 'product' ? 'No featured products listed yet.' : 'No featured services listed yet.'}
-              </Text>
-            ) : (
-              displayService.catalog.map((item: any, i: number) => (
-                <View key={i} style={styles.serviceCard}>
-                  <View style={styles.serviceInfo}>
-                    <Text style={styles.serviceName}>{item.name}</Text>
-                    <Text style={styles.serviceDesc}>{item.description || t('service_detail.includes_support')}</Text>
-                  </View>
-                  <Text style={[styles.servicePrice, (item.price === null || item.price === undefined || item.price === '') && { fontSize: 11, color: '#94a3b8' }]}>
-                    {item.price !== null && item.price !== undefined && item.price !== '' ? `₹${item.price}` : 'Price on Request'}
-                  </Text>
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-
-        {(activeTab === t('service_detail.gallery')) && (
-          <View style={{ gap: 20 }}>
-            {/* Photos Showcase */}
+          {activeTab === (displayService.type === 'product' ? t('service_detail.featured_products') : t('service_detail.featured_services')) && (
             <View style={styles.cardSection}>
-              <Text style={styles.cardTitle}>Photos & Work Showcase</Text>
-              <View style={styles.galleryGrid}>
-                {displayService.images && displayService.images.length > 0 ? (
-                  displayService.images.map((imgUri: string, idx: number) => (
-                    <TouchableOpacity 
-                      key={idx} 
-                      onPress={() => { setPreviewImage(imgUri); setPreviewIndex(idx); }}
-                      activeOpacity={0.8}
-                      style={styles.galleryImageWrapper}
-                    >
-                      <Image source={{ uri: imgUri }} style={styles.galleryImage} />
-                    </TouchableOpacity>
-                  ))
+              <Text style={styles.cardTitle}>{displayService.type === 'product' ? t('service_detail.featured_products') : t('service_detail.featured_services')}</Text>
+              {(!displayService.catalog || displayService.catalog.length === 0) ? (
+                <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', marginVertical: 20 }}>
+                  {displayService.type === 'product' ? 'No featured products listed yet.' : 'No featured services listed yet.'}
+                </Text>
+              ) : (
+                displayService.catalog.map((item: any, i: number) => (
+                  <View key={i} style={styles.serviceCard}>
+                    <View style={styles.serviceInfo}>
+                      <Text style={styles.serviceName}>{item.name}</Text>
+                      <Text style={styles.serviceDesc}>{item.description || t('service_detail.includes_support')}</Text>
+                    </View>
+                    <Text style={[styles.servicePrice, (item.price === null || item.price === undefined || item.price === '') && { fontSize: 11, color: '#94a3b8' }]}>
+                      {item.price !== null && item.price !== undefined && item.price !== '' ? `₹${item.price}` : 'Price on Request'}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+
+
+          {(activeTab === t('service_detail.gallery')) && (
+            <View style={{ gap: 20 }}>
+              {/* Photos Showcase */}
+              <View style={styles.cardSection}>
+                <Text style={styles.cardTitle}>Photos & Work Showcase</Text>
+                <View style={styles.galleryGrid}>
+                  {displayService.images && displayService.images.length > 0 ? (
+                    displayService.images.map((imgUri: string, idx: number) => (
+                      <TouchableOpacity
+                        key={idx}
+                        onPress={() => { setPreviewImage(imgUri); setPreviewIndex(idx); }}
+                        activeOpacity={0.8}
+                        style={styles.galleryImageWrapper}
+                      >
+                        <Image source={{ uri: imgUri }} style={styles.galleryImage} />
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => { setPreviewImage(displayService.image || `https://picsum.photos/seed/${displayService.id}1/400/300`); setPreviewIndex(0); }}
+                        activeOpacity={0.8}
+                        style={styles.galleryImageWrapper}
+                      >
+                        <Image source={{ uri: displayService.image || `https://picsum.photos/seed/${displayService.id}1/400/300` }} style={styles.galleryImage} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => { setPreviewImage(`https://picsum.photos/seed/${displayService.id}2/400/300`); setPreviewIndex(1); }}
+                        activeOpacity={0.8}
+                        style={styles.galleryImageWrapper}
+                      >
+                        <Image source={{ uri: `https://picsum.photos/seed/${displayService.id}2/400/300` }} style={styles.galleryImage} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => { setPreviewImage(`https://picsum.photos/seed/${displayService.id}3/400/300`); setPreviewIndex(2); }}
+                        activeOpacity={0.8}
+                        style={styles.galleryImageWrapper}
+                      >
+                        <Image source={{ uri: `https://picsum.photos/seed/${displayService.id}3/400/300` }} style={styles.galleryImage} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => { setPreviewImage(`https://picsum.photos/seed/${displayService.id}4/400/300`); setPreviewIndex(3); }}
+                        activeOpacity={0.8}
+                        style={styles.galleryImageWrapper}
+                      >
+                        <Image source={{ uri: `https://picsum.photos/seed/${displayService.id}4/400/300` }} style={styles.galleryImage} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+
+              {/* Videos Showcase */}
+              <View style={styles.cardSection}>
+                <Text style={styles.cardTitle}>Promotional Videos</Text>
+                {displayService.videos && displayService.videos.length > 0 ? (
+                  <View style={styles.galleryGrid}>
+                    {displayService.videos.map((vidUri: string, idx: number) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[styles.galleryImage, { backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }]}
+                        onPress={() => Linking.openURL(vidUri)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="play-circle" size={48} color="#10b981" />
+                        <View style={{ position: 'absolute', bottom: 8, left: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', padding: 4, borderRadius: 4, alignItems: 'center' }}>
+                          <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>Play Video {idx + 1}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 ) : (
-                  <>
-                    <TouchableOpacity 
-                      onPress={() => { setPreviewImage(displayService.image || `https://picsum.photos/seed/${displayService.id}1/400/300`); setPreviewIndex(0); }}
-                      activeOpacity={0.8}
-                      style={styles.galleryImageWrapper}
-                    >
-                      <Image source={{ uri: displayService.image || `https://picsum.photos/seed/${displayService.id}1/400/300` }} style={styles.galleryImage} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      onPress={() => { setPreviewImage(`https://picsum.photos/seed/${displayService.id}2/400/300`); setPreviewIndex(1); }}
-                      activeOpacity={0.8}
-                      style={styles.galleryImageWrapper}
-                    >
-                      <Image source={{ uri: `https://picsum.photos/seed/${displayService.id}2/400/300` }} style={styles.galleryImage} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      onPress={() => { setPreviewImage(`https://picsum.photos/seed/${displayService.id}3/400/300`); setPreviewIndex(2); }}
-                      activeOpacity={0.8}
-                      style={styles.galleryImageWrapper}
-                    >
-                      <Image source={{ uri: `https://picsum.photos/seed/${displayService.id}3/400/300` }} style={styles.galleryImage} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      onPress={() => { setPreviewImage(`https://picsum.photos/seed/${displayService.id}4/400/300`); setPreviewIndex(3); }}
-                      activeOpacity={0.8}
-                      style={styles.galleryImageWrapper}
-                    >
-                      <Image source={{ uri: `https://picsum.photos/seed/${displayService.id}4/400/300` }} style={styles.galleryImage} />
-                    </TouchableOpacity>
-                  </>
+                  <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', marginVertical: 10 }}>
+                    No promotional videos uploaded yet.
+                  </Text>
                 )}
               </View>
             </View>
-
-            {/* Videos Showcase */}
-            <View style={styles.cardSection}>
-              <Text style={styles.cardTitle}>Promotional Videos</Text>
-              {displayService.videos && displayService.videos.length > 0 ? (
-                <View style={styles.galleryGrid}>
-                  {displayService.videos.map((vidUri: string, idx: number) => (
-                    <TouchableOpacity 
-                      key={idx} 
-                      style={[styles.galleryImage, { backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }]}
-                      onPress={() => Linking.openURL(vidUri)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="play-circle" size={48} color="#10b981" />
-                      <View style={{ position: 'absolute', bottom: 8, left: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', padding: 4, borderRadius: 4, alignItems: 'center' }}>
-                        <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>Play Video {idx + 1}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', marginVertical: 10 }}>
-                  No promotional videos uploaded yet.
-                </Text>
-              )}
-            </View>
-          </View>
-        )}
-<View style={{ height: 150 + insets.bottom }} />
+          )}
+          <View style={{ height: 150 + insets.bottom }} />
         </View>
       </ScrollView>
 
       {/* 5. Translucent Blur Floating bottom Action Bar */}
       <View style={[styles.footerWrap, { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
-    <View style={styles.actionBar}>
-      <TouchableOpacity style={styles.circleActionButton} onPress={handleWhatsApp}>
-        <Ionicons name="logo-whatsapp" size={22} color="#10b981" />
-        <Text style={styles.circleActionText}>WhatsApp</Text>
-      </TouchableOpacity>
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={styles.circleActionButton} onPress={handleWhatsApp}>
+            <Ionicons name="logo-whatsapp" size={22} color="#10b981" />
+            <Text style={styles.circleActionText}>WhatsApp</Text>
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.mainCallButton} onPress={handleCall}>
-        <LinearGradient
-          colors={['#2563EB', '#1d4ed8']}
-          style={styles.mainCallGradient}
-        >
-          <Ionicons name="call" size={18} color="white" />
-          <Text style={styles.mainCallText}>{t('service_detail.call_business')}</Text>
-        </LinearGradient>
-      </TouchableOpacity>
+          <TouchableOpacity style={styles.mainCallButton} onPress={handleCall}>
+            <LinearGradient
+              colors={['#2563EB', '#1d4ed8']}
+              style={styles.mainCallGradient}
+            >
+              <Ionicons name="call" size={18} color="white" />
+              <Text style={styles.mainCallText}>{t('service_detail.call_business')}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.circleActionButton} onPress={handleDirections}>
-        <Ionicons name="navigate-circle" size={22} color="#3b82f6" />
-        <Text style={styles.circleActionText}>Directions</Text>
-      </TouchableOpacity>
-    </View>
+          <TouchableOpacity style={styles.circleActionButton} onPress={handleDirections}>
+            <Ionicons name="navigate-circle" size={22} color="#3b82f6" />
+            <Text style={styles.circleActionText}>Directions</Text>
+          </TouchableOpacity>
+        </View>
       </View >
 
       {/* Fullscreen Image Viewer Modal */}
       <Modal visible={!!previewImage} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
-          <TouchableOpacity 
-            style={styles.modalCloseBtn} 
+          <TouchableOpacity
+            style={styles.modalCloseBtn}
             onPress={() => setPreviewImage(null)}
           >
             <Ionicons name="close" size={32} color="white" />
           </TouchableOpacity>
-          
+
           {/* Image Counter */}
           <View style={styles.imageCounter}>
             <Text style={styles.imageCounterText}>
@@ -660,7 +520,7 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
 
           {/* Navigation Buttons */}
           {previewIndex > 0 && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.navButtonLeft}
               onPress={() => {
                 const newIndex = previewIndex - 1;
@@ -671,9 +531,9 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
               <Ionicons name="chevron-back" size={32} color="white" />
             </TouchableOpacity>
           )}
-          
+
           {previewIndex < (displayService.images?.length || 4) - 1 && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.navButtonRight}
               onPress={() => {
                 const newIndex = previewIndex + 1;
@@ -686,10 +546,10 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
           )}
 
           {previewImage && (
-            <Image 
-              source={{ uri: previewImage }} 
-              style={styles.fullscreenImage} 
-              resizeMode="contain" 
+            <Image
+              source={{ uri: previewImage }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
             />
           )}
         </View>
@@ -975,7 +835,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase'
   },
-  
+
   // Compact Details Desk Card Styles
   compactDeskCard: {
     backgroundColor: 'white',
@@ -1075,7 +935,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#065f46',
   },
-  
+
   // Premium Interactive Review Styles
   premiumReviewContainer: {
     padding: 20,

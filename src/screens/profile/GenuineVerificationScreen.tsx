@@ -23,6 +23,10 @@ import notificationService from '../../services/notification.service';
 export default function GenuineVerificationScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [verificationPrice, setVerificationPrice] = useState<number>(99);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isVerified, setIsVerified] = useState<boolean>(false);
+  const [startDate, setStartDate] = useState<any>(null);
+  const [endDate, setEndDate] = useState<any>(null);
 
   useEffect(() => {
     const fetchPricing = async () => {

@@ -132,6 +132,8 @@ export default function RootNavigator() {
       console.warn("Jobs listener setup error:", err);
     }
 
+    let unsubscribeUserNotifs: () => void = () => {};
+
     const unsubscribeAuth = authService.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
 
@@ -148,9 +150,40 @@ export default function RootNavigator() {
           }
           setLoading(false);
         });
+
+        // Real-time listener for incoming vendor leads / personal notifications
+        try {
+          const userNotifQuery = query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.uid)
+          );
+          const initialTimestamp = Date.now();
+          unsubscribeUserNotifs = onSnapshot(userNotifQuery, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+              if (change.type === 'added') {
+                const notifData = change.doc.data();
+                const createdAtMs = new Date(notifData.createdAt || 0).getTime();
+                // Alert if created now or recently
+                if (createdAtMs > initialTimestamp - 5000) {
+                  const title = notifData.title || 'New Lead Alert 🔔';
+                  const body = notifData.body || notifData.message || 'Someone viewed your business profile. Tap to check My Leads!';
+                  notificationService.sendLocalNotification(title, body, {
+                    ...notifData,
+                    screen: notifData.screen || 'MyLeads',
+                  });
+                }
+              }
+            });
+          }, (err) => {
+            console.warn("User notification listener notice:", err?.message);
+          });
+        } catch (notifErr) {
+          console.warn("User notification listener setup error:", notifErr);
+        }
       } else {
         setProfileCompleted(false);
         setLoading(false);
+        if (unsubscribeUserNotifs) unsubscribeUserNotifs();
       }
     });
 
@@ -164,7 +197,16 @@ export default function RootNavigator() {
           const category = data.category;
           console.log("[Notification Clicked] Category extracted:", category);
 
-          if (category === 'Central Govt' || category === 'State Govt') {
+          // Route to My Leads when tapping vendor lead alerts
+          if (data.screen === 'MyLeads' || data.type === 'profile_view' || data.type === 'call_lead' || data.type === 'whatsapp_lead') {
+            console.log("[Notification Clicked] Routing to MyLeads screen");
+            navigationRef.navigate('MainApp' as any, {
+              screen: 'ServicesWorld',
+              params: {
+                screen: 'MyLeads'
+              }
+            } as any);
+          } else if (category === 'Central Govt' || category === 'State Govt') {
             console.log("[Notification Clicked] Routing to Jobs tab with category:", category);
             // Redirect to Jobs tab, pre-filtering by Central Govt / State Govt
             navigationRef.navigate('MainApp' as any, {
@@ -197,6 +239,7 @@ export default function RootNavigator() {
     return () => {
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
+      if (unsubscribeUserNotifs) unsubscribeUserNotifs();
       notificationSubscription.remove();
     };
   }, []);

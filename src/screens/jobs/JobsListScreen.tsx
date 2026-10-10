@@ -29,12 +29,16 @@ import { useJobCategories } from '../../hooks/useDynamicCategories';
 
 const isJobGenuine = (item: any) => {
   if (!item) return false;
-  if (!item.isGenuineVerified) return false;
-  if (!item.genuineVerificationEndDate) return true; // fallback for legacy items
-  const end = item.genuineVerificationEndDate.toDate
-    ? item.genuineVerificationEndDate.toDate()
-    : new Date(item.genuineVerificationEndDate);
-  return end > new Date();
+  if (!item.isGenuineVerified && !item.hasVerificationBadge && !item.isVerified && item.verificationStatus !== 'verified') return false;
+  if (!item.genuineVerificationEndDate) return true; // fallback for legacy items / admin lifetime
+  try {
+    const end = item.genuineVerificationEndDate.toDate
+      ? item.genuineVerificationEndDate.toDate()
+      : new Date(item.genuineVerificationEndDate);
+    return end > new Date();
+  } catch {
+    return true;
+  }
 };
 
 const AP_DISTRICTS = [

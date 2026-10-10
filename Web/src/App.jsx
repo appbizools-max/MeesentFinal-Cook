@@ -13,6 +13,7 @@ import { JobPayments } from './pages/JobPayments';
 import { ServicePayments } from './pages/ServicePayments';
 import { VendorTransactions } from './pages/VendorTransactions';
 import { VendorAnalytics } from './pages/VendorAnalytics';
+import { VendorLeadsTransfer } from './pages/VendorLeadsTransfer';
 import { Banners } from './pages/Banners';
 import { PricingSettings } from './pages/PricingSettings';
 import { SupportMessages } from './pages/SupportMessages';
@@ -53,6 +54,7 @@ function App() {
           <Route path="/unverified-users" element={<UnverifiedUsers />} />
           <Route path="/employees" element={<Employees />} />
           <Route path="/vendors" element={<Vendors />} />
+          <Route path="/vendors/leads" element={<VendorLeadsTransfer />} />
           <Route path="/vendors/analytics" element={<VendorAnalytics />} />
           <Route path="/vendors/transactions" element={<VendorTransactions />} />
           <Route path="/jobs" element={<JobPortal />} />

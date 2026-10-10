@@ -539,7 +539,7 @@ export default function ServicesSearchScreen({ navigation, route }: any) {
                         <Text style={styles.topRatedBadgeText}>Top Rated</Text>
                       </View>
                     )}
-                    {item.tookVerification && (
+                    {(item.tookVerification || item.isVerified || item.verifyMark || item.verificationStatus === 'verified') && (
                       <View style={styles.verifiedBadge}>
                         <Ionicons name="checkmark-circle" size={10} color="#1e40af" style={{ marginRight: 2 }} />
                         <Text style={styles.verifiedBadgeText}>Verified</Text>

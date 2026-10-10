@@ -16,6 +16,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { useTranslation } from 'react-i18next';
+import Constants from 'expo-constants';
 
 const { width } = Dimensions.get('window');
 
@@ -248,7 +249,7 @@ export default function JobsSidebar({ visible, onClose, navigation }: SidebarPro
               </TouchableOpacity>
 
               <View style={styles.footerContainer}>
-                <Text style={styles.versionText}>{t('sidebar.version')} 1.0.0</Text>
+                <Text style={styles.versionText}>{t('sidebar.version')} {Constants.expoConfig?.version || '1.1.8'}</Text>
                 <Text style={styles.brandText}>Messent App</Text>
               </View>
             </View>
@@ -258,7 +259,6 @@ export default function JobsSidebar({ visible, onClose, navigation }: SidebarPro
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,

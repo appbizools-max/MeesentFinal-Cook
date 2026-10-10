@@ -10,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 class NotificationService {
@@ -78,8 +80,8 @@ class NotificationService {
     }
   }
 
-  // Send a local notification (for testing or immediate feedback)
-  async sendLocalNotification(title: string, body: string) {
+  // Send a local notification (for testing, live alerts, or immediate feedback)
+  async sendLocalNotification(title: string, body: string, data: any = {}) {
     try {
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
@@ -107,7 +109,7 @@ class NotificationService {
           content: {
             title,
             body,
-            data: { data: 'goes here' },
+            data: data || {},
             sound: true,
             priority: Notifications.AndroidNotificationPriority.MAX,
           },

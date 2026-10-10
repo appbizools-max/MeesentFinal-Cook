@@ -152,16 +152,39 @@ export const dailySubscriptionEvaluation = functions.pubsub
         const metricDocId = `${vendorId}_${monthKey}`;
 
         const metricSnap = await db.collection('vendorMonthlyMetrics').doc(metricDocId).get();
-        let guaranteeMet = false;
         let viewCount = 0;
         let callCount = 0;
+        let whatsappCount = 0;
 
         if (metricSnap.exists) {
           const metricData = metricSnap.data();
           viewCount = metricData?.viewCount || 0;
           callCount = metricData?.callCount || 0;
-          guaranteeMet = viewCount >= 5 || callCount >= 1;
+          whatsappCount = metricData?.whatsappCount || 0;
         }
+
+        // Also query direct leads for this vendor in this period
+        try {
+          const startIso = currentPeriodStart.toDate ? currentPeriodStart.toDate().toISOString() : new Date(currentPeriodStart).toISOString();
+          const endIso = currentPeriodEnd.toDate ? currentPeriodEnd.toDate().toISOString() : new Date(currentPeriodEnd).toISOString();
+          const leadsSnap = await db.collection('leads')
+            .where('vendorId', '==', vendorId)
+            .get();
+
+          leadsSnap.forEach((lSnap) => {
+            const lData = lSnap.data();
+            const createdAt = lData?.createdAt;
+            if (createdAt && createdAt >= startIso && createdAt <= endIso) {
+              if (lData.hasCalled || lData.type === 'call') callCount++;
+              else if (lData.hasWhatsApp || lData.type === 'whatsapp') whatsappCount++;
+              else viewCount++;
+            }
+          });
+        } catch (e) {
+          console.warn(`Error reading leads for vendor ${vendorId}:`, e);
+        }
+
+        const guaranteeMet = viewCount >= 5 || callCount >= 1 || whatsappCount >= 1;
 
         const batch = db.batch();
 

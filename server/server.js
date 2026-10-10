@@ -617,6 +617,55 @@ app.post('/api/admin/send-job-notification', requireAdmin, async (req, res) => {
   }
 });
 
+// ── Send Instant Lead Push Notification to Vendor ─────────────────────────────
+app.post('/api/send-lead-notification', async (req, res) => {
+  try {
+    const { vendorOwnerId, title, message, type = 'profile_view' } = req.body;
+    if (!vendorOwnerId) {
+      return res.status(400).json({ error: 'Missing vendorOwnerId' });
+    }
+
+    const userDoc = await adminDb.collection('users').doc(vendorOwnerId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'Vendor user not found' });
+    }
+
+    const token = userDoc.data()?.fcmToken;
+    if (!token) {
+      return res.json({ success: false, message: 'No registered FCM token found for vendor' });
+    }
+
+    const notifTitle = title || 'New Profile Visitor 👀';
+    const notifBody = message || 'Someone viewed your business profile. Tap to check in My Leads!';
+
+    const payload = {
+      token: token,
+      notification: {
+        title: notifTitle,
+        body: notifBody,
+      },
+      data: {
+        type: type,
+        screen: 'MyLeads',
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      },
+      android: {
+        notification: {
+          sound: 'default',
+          priority: 'high',
+        }
+      }
+    };
+
+    const response = await admin.messaging().send(payload);
+    console.log(`[FCM Lead] Sent push to vendor ${vendorOwnerId}:`, response);
+    res.json({ success: true, messageId: response });
+  } catch (error) {
+    console.error('FCM Lead Notification Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ── Send Support Notification to User ───────────────────────────────────────
 app.post('/api/admin/send-support-notification', requireAdmin, async (req, res) => {
   try {

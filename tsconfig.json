@@ -13,7 +13,11 @@
       "@types/*": ["src/types/*"],
       "@redux/*": ["src/redux/*"],
       "@hooks/*": ["src/hooks/*"],
-      "@assets/*": ["assets/*"]
+      "@assets/*": ["assets/*"],
+      "firebase/firestore": ["src/services/firebase-firestore-compat.ts"],
+      "firebase/storage": ["src/services/firebase-storage-compat.ts"],
+      "firebase/auth": ["src/services/firebase-auth-compat.ts"],
+      "firebase/app": ["src/services/firebase-app-compat.ts"]
     }
   }
 }
