@@ -90,13 +90,39 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
   }, [service.id]);
 
   const handleCall = () => {
-    leadService.recordCall(displayService);
-    Linking.openURL(`tel:${service.phone}`);
+    const businessName = service.businessName || displayService?.businessName || 'this business';
+    Alert.alert(
+      'Confirm Call',
+      `Do you want to call ${businessName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            leadService.recordCall(displayService);
+            Linking.openURL(`tel:${service.phone}`);
+          },
+        },
+      ]
+    );
   };
 
   const handleWhatsApp = () => {
-    leadService.recordWhatsApp(displayService);
-    Linking.openURL(`whatsapp://send?phone=${service.phone}`);
+    const businessName = service.businessName || displayService?.businessName || 'this business';
+    Alert.alert(
+      'Open WhatsApp',
+      `Do you want to chat with ${businessName} on WhatsApp?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            leadService.recordWhatsApp(displayService);
+            Linking.openURL(`whatsapp://send?phone=${service.phone}`);
+          },
+        },
+      ]
+    );
   };
 
   const handleDirections = () => {

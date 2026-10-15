@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Dimensions, StyleSheet, ActivityIndicator, Modal, Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Dimensions, StyleSheet, ActivityIndicator, Modal, Linking, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -245,6 +245,8 @@ const PRODUCT_CATS = ALL_PRODUCTS.slice(0, 15).map((prod, index) => {
   };
 });
 
+const SUBTITLE_SEQUENCE = ['Services', 'Mart', 'Jobs', 'Services • Mart • Jobs'];
+
 export default function ServicesHomeScreen({ navigation }: any) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -258,6 +260,50 @@ export default function ServicesHomeScreen({ navigation }: any) {
   const [loadingVendors, setLoadingVendors] = useState(true);
   const [userBusinesses, setUserBusinesses] = useState<any[]>([]);
   const [showBusinessDropdown, setShowBusinessDropdown] = useState(false);
+
+  // Subtitle animation: cycles Services -> Mart -> Jobs, then permanently stays on 'Services • Mart • Jobs'
+  const [wordIndex, setWordIndex] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // If reached the final combined state, stay permanently static
+    if (wordIndex >= SUBTITLE_SEQUENCE.length - 1) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -8,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setWordIndex((prev) => prev + 1);
+        slideAnim.setValue(8);
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 260,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 260,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [wordIndex, fadeAnim, slideAnim]);
 
   const nowForPlan = new Date();
   const isPremiumActive = (item: any) => {
@@ -400,6 +446,31 @@ export default function ServicesHomeScreen({ navigation }: any) {
       }
     });
 
+    // Fallback GPS reverse geocoding if user has no city set in profile
+    (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (loc?.coords) {
+            const [geo] = await Location.reverseGeocodeAsync({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude
+            });
+            if (geo) {
+              const detectedCity = geo.city || geo.district || geo.subregion || geo.region;
+              if (detectedCity) {
+                setUserCity(prev => prev || detectedCity);
+              }
+              if (geo.region) {
+                setUserState(prev => prev || geo.region);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    })();
+
     return () => unsubscribeUser();
   }, []);
 
@@ -522,22 +593,26 @@ export default function ServicesHomeScreen({ navigation }: any) {
           style={styles.headerGradient}
         >
           <SafeAreaView edges={['top']}>
+            {/* Top Left Location Row */}
+            <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 2, flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="location-sharp" size={14} color="#ffffff" style={{ marginRight: 4 }} />
+              <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '800' }} numberOfLines={1}>
+                {userCity ? (userState ? `${userCity}, ${userState}` : userCity) : (userPincode ? `Pincode: ${userPincode}` : 'Hyderabad, Telangana')}
+              </Text>
+            </View>
+
             <View style={styles.headerTop}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 10 }}>
-                  <Ionicons name="chevron-back" size={28} color="#1e293b" />
-                </TouchableOpacity>
                 <TouchableOpacity onPress={() => setSidebarVisible(true)} style={{ marginRight: 15 }}>
-                  <Ionicons name="menu" size={30} color="#1e293b" />
+                  <Ionicons name="menu" size={30} color="#ffffff" />
                 </TouchableOpacity>
                 <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={styles.brandTitle}>MEESENT</Text>
-                    <View style={{ marginLeft: 8, backgroundColor: '#2563EB', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, color: 'white', fontWeight: 'bold', textTransform: 'uppercase' }}>{i18n.language}</Text>
-                    </View>
+                  <Text style={styles.brandTitle}>MEESENT</Text>
+                  <View style={{ minHeight: 18, justifyContent: 'center', overflow: 'hidden' }}>
+                    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+                      <Text style={styles.brandSub} numberOfLines={1}>{SUBTITLE_SEQUENCE[wordIndex]}</Text>
+                    </Animated.View>
                   </View>
-                  <Text style={styles.brandSub}>{t('services_home.brand_sub')}</Text>
                 </View>
               </View>
               <View style={styles.headerActions}>
@@ -1023,14 +1098,14 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#1e293b',
+    color: '#ffffff',
     letterSpacing: -1.5,
   },
   brandSub: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: 'bold',
-    marginTop: -4,
+    fontSize: 11.5,
+    color: '#ffffff',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   headerActions: {
     flexDirection: 'row',
@@ -1068,8 +1143,19 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: 24,
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  locationText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   greetingRow: {
     flexDirection: 'row',
@@ -1088,11 +1174,11 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   headerHeadline: {
-    fontSize: 28,
+    fontSize: 18,
     color: 'white',
-    fontWeight: '900',
-    letterSpacing: -1,
-    lineHeight: 34,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    lineHeight: 24,
   },
   searchContainer: {
     paddingHorizontal: 24,

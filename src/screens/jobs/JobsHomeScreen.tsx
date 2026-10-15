@@ -71,9 +71,20 @@ const JobsHomeScreen = ({ navigation }: any) => {
     const isPremium = seekerPlanActive && seekerPlanExpiry && (seekerPlanExpiry.toDate ? seekerPlanExpiry.toDate() : new Date(seekerPlanExpiry)) > new Date();
     
     const isSalaryOver20k = () => {
-      if (!clickedJob || !clickedJob.salary) return false;
+      if (!clickedJob) return false;
+      if (clickedJob.isPremiumJobSeekerOnly === true || clickedJob.requiresPremium === true) return true;
+      if (clickedJob.minSalary !== undefined && clickedJob.minSalary !== null && !isNaN(Number(clickedJob.minSalary))) {
+        return Number(clickedJob.minSalary) >= 20000;
+      }
+      if (!clickedJob.salary) return false;
       try {
         const salStr = clickedJob.salary.toString().toLowerCase();
+        const rangeMatch = salStr.match(/^₹?\s*(\d+[\d,]*)\s*(?:k)?\s*[-–to]/i);
+        if (rangeMatch) {
+          let minVal = parseInt(rangeMatch[1].replace(/,/g, ''), 10);
+          if (salStr.includes('k') && minVal < 1000) minVal *= 1000;
+          return minVal >= 20000;
+        }
         const kMatch = salStr.match(/(\d+)\s*k/);
         if (kMatch) {
           return parseInt(kMatch[1], 10) * 1000 >= 20000;
@@ -921,8 +932,10 @@ const JobsHomeScreen = ({ navigation }: any) => {
                           <View style={styles.cardMetaRow}>
                             <View style={styles.cardMetaItem}>
                               <Ionicons name="location" size={12} color="#3b82f6" />
-                              <Text style={[styles.cardMetaText, { color: '#475569' }]}>
-                                {job.location?.split(',')[0]}
+                              <Text style={[styles.cardMetaText, { color: '#475569' }]} numberOfLines={1}>
+                                {job.constituency
+                                  ? `${job.constituency}, ${job.district || job.location?.split(',')[0]}`
+                                  : job.location?.split(',')[0]}
                               </Text>
                             </View>
                             <View style={styles.cardMetaDivider} />
@@ -952,20 +965,27 @@ const JobsHomeScreen = ({ navigation }: any) => {
                         <View style={styles.cardSalaryContainer}>
                           <Text style={styles.cardSalaryLabel}>{t('jobs_list.est_salary')}</Text>
                           <Text style={styles.cardSalaryValue}>
-                            {job.salary || t('jobs_list.negotiable')}
-                            {job.salaryType ? (
-                              <Text style={styles.salaryTypeSuffix}>
-                                {(() => {
-                                  const lower = job.salaryType.toLowerCase();
-                                  if (lower.includes('month')) return ' / Month';
-                                  if (lower.includes('year')) return ' / Year';
-                                  if (lower.includes('hour')) return ' / Hour';
-                                  if (lower.includes('day')) return ' / Day';
-                                  if (lower.includes('project')) return ' / Project';
-                                  return ` / ${job.salaryType}`;
-                                })()}
-                              </Text>
-                            ) : null}
+                            {(() => {
+                              if (job.minSalary && job.maxSalary) {
+                                return `₹${Number(job.minSalary).toLocaleString()} - ₹${Number(job.maxSalary).toLocaleString()}`;
+                              }
+                              if (job.minSalary) {
+                                return `₹${Number(job.minSalary).toLocaleString()}+`;
+                              }
+                              return job.salary || t('jobs_list.negotiable');
+                            })()}
+                            <Text style={styles.salaryTypeSuffix}>
+                              {(() => {
+                                if (!job.salaryType) return ' / Month';
+                                const lower = job.salaryType.toLowerCase();
+                                if (lower.includes('month')) return ' / Month';
+                                if (lower.includes('year')) return ' / Year';
+                                if (lower.includes('hour')) return ' / Hour';
+                                if (lower.includes('day')) return ' / Day';
+                                if (lower.includes('project')) return ' / Project';
+                                return ` / ${job.salaryType}`;
+                              })()}
+                            </Text>
                           </Text>
                         </View>
                         <View style={styles.premiumCardActionBtn}>

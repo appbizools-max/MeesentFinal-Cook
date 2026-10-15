@@ -89,7 +89,8 @@ export default function SelectionScreen({ navigation }: any) {
         <Animated.View style={{ opacity: fadeAnim1, transform: [{ translateY: slideAnim1 }] }}>
           <TouchableOpacity
             onPress={() => navigation.navigate('JobsWorld')}
-            className="bg-white rounded-2xl shadow-sm shadow-red-100/50 mb-3 p-2.5 border border-red-50/50"
+            className="bg-white rounded-2xl shadow-sm shadow-red-100/50 mb-3 p-2.5 border border-black"
+            style={{ borderColor: '#000000', borderWidth: 1 }}
           >
             <View className="flex-row justify-between mb-2">
               <View className="flex-1 pr-2 mt-0.5">
@@ -118,7 +119,6 @@ export default function SelectionScreen({ navigation }: any) {
                 />
               </View>
             </View>
-
             {/* Footer Tabs inside Jobs Card */}
             <View className="flex-row items-center justify-between pt-2 border-t border-gray-50 mt-0.5 pb-0.5">
               <View className="flex-row items-center flex-1 justify-center">
@@ -138,14 +138,12 @@ export default function SelectionScreen({ navigation }: any) {
             </View>
           </TouchableOpacity>
         </Animated.View>
-
-
-
         {/* MART Card */}
         <Animated.View style={{ opacity: fadeAnim2, transform: [{ translateY: slideAnim2 }] }}>
           <TouchableOpacity
             onPress={() => navigation.navigate('ServicesWorld')}
-            className="bg-white rounded-2xl shadow-sm shadow-red-100/50 mb-3 border border-red-50/50 overflow-hidden pb-2.5"
+            className="bg-white rounded-2xl shadow-sm shadow-red-100/50 mb-3 border border-black overflow-hidden pb-2.5"
+            style={{ borderColor: '#000000', borderWidth: 1 }}
           >
             {/* Top Row: MART Tag, Avatars, Call Icon */}
             <View className="items-center">
@@ -168,18 +166,36 @@ export default function SelectionScreen({ navigation }: any) {
               </Text>
 
               {/* 3D Products Images with Labels */}
-              <View className="flex-row items-end justify-between px-1 mb-3 mt-0.5">
-                <View className="items-center w-1/3">
-                  <Image source={require('../../assets/images/home_appliances.png')} style={{ width: 36, height: 36, marginBottom: 4 }} resizeMode="contain" />
-                  <Text className="text-[8px] font-bold text-gray-600 text-center">Home Appliances</Text>
+              <View className="flex-row items-start justify-between px-1 mb-3 mt-1">
+                <View className="items-center flex-1 px-1">
+                  <Image
+                    source={require('../../assets/images/home_appliances.png')}
+                    style={{ width: 40, height: 40, marginBottom: 4 }}
+                    resizeMode="contain"
+                  />
+                  <Text numberOfLines={2} className="text-[9px] font-bold text-gray-600 text-center leading-tight">
+                    Home Appliances
+                  </Text>
                 </View>
-                <View className="items-center w-1/3">
-                  <Image source={require('../../assets/images/machinery_tools.png')} style={{ width: 54, height: 44, marginBottom: 4 }} resizeMode="contain" />
-                  <Text className="text-[8px] font-bold text-gray-600 text-center">Machinery & Tools</Text>
+                <View className="items-center flex-1 px-1">
+                  <Image
+                    source={require('../../assets/images/machinery_tools.png')}
+                    style={{ width: 40, height: 40, marginBottom: 4 }}
+                    resizeMode="contain"
+                  />
+                  <Text numberOfLines={2} className="text-[9px] font-bold text-gray-600 text-center leading-tight">
+                    Machinery & Tools
+                  </Text>
                 </View>
-                <View className="items-center w-1/3">
-                  <Image source={require('../../assets/images/industrial_supplies.png')} style={{ width: 54, height: 44, marginBottom: 4 }} resizeMode="contain" />
-                  <Text style={{ display: 'none' }} className="text-[8px] font-bold text-gray-600 text-center">Industrial Supplies</Text>
+                <View className="items-center flex-1 px-1">
+                  <Image
+                    source={require('../../assets/images/industrial_supplies.png')}
+                    style={{ width: 40, height: 40, marginBottom: 4 }}
+                    resizeMode="contain"
+                  />
+                  <Text numberOfLines={2} className="text-[9px] font-bold text-gray-600 text-center leading-tight">
+                    Industrial Supplies
+                  </Text>
                 </View>
               </View>
 

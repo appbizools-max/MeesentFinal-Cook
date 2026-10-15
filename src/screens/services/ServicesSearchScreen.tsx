@@ -12,6 +12,7 @@ import {
   TextInput,
   Share,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -419,13 +420,39 @@ export default function ServicesSearchScreen({ navigation, route }: any) {
   };
 
   const handleCall = (item: any) => {
-    logLead(item, 'call');
-    Linking.openURL(`tel:${item.phone}`);
+    const businessName = item.businessName || 'this business';
+    Alert.alert(
+      'Confirm Call',
+      `Do you want to call ${businessName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            logLead(item, 'call');
+            Linking.openURL(`tel:${item.phone}`);
+          },
+        },
+      ]
+    );
   };
 
   const handleWhatsApp = (item: any) => {
-    logLead(item, 'whatsapp');
-    Linking.openURL(`whatsapp://send?phone=${item.phone}`);
+    const businessName = item.businessName || 'this business';
+    Alert.alert(
+      'Open WhatsApp',
+      `Do you want to chat with ${businessName} on WhatsApp?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            logLead(item, 'whatsapp');
+            Linking.openURL(`whatsapp://send?phone=${item.phone}`);
+          },
+        },
+      ]
+    );
   };
 
   const handleMapRedirect = (item: any) => {

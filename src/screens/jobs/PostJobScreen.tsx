@@ -20,7 +20,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase';
 import { RAZORPAY_CONFIG } from '../../config/razorpay';
 import * as Location from 'expo-location';
@@ -30,6 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import RazorpayCheckout from 'react-native-razorpay';
 import notificationService from '../../services/notification.service';
 import { useJobCategories } from '../../hooks/useDynamicCategories';
+import { PINCODES } from '../../data/pincodes';
 
 const AP_DISTRICTS = [
   'Anantapur', 'Chittoor', 'East Godavari', 'Guntur', 'Krishna', 'Kurnool',
@@ -169,8 +170,21 @@ export default function PostJobScreen({ navigation }: any) {
   const [category, setCategory] = useState('');
   const [jobType, setJobType] = useState('');
   const [location, setLocation] = useState('');
-  const [salary, setSalary] = useState('');
+  const [minSalary, setMinSalary] = useState('');
+  const [maxSalary, setMaxSalary] = useState('');
   const [salaryType, setSalaryType] = useState('Per Month');
+
+  const minSalaryNum = useMemo(() => {
+    const clean = minSalary.replace(/[^0-9]/g, '');
+    return clean ? parseInt(clean, 10) : 0;
+  }, [minSalary]);
+
+  const maxSalaryNum = useMemo(() => {
+    const clean = maxSalary.replace(/[^0-9]/g, '');
+    return clean ? parseInt(clean, 10) : 0;
+  }, [maxSalary]);
+
+  const isMinOver20k = minSalaryNum >= 20000;
   const [experience, setExperience] = useState('');
   const [description, setDescription] = useState('');
   const [company, setCompany] = useState('');
@@ -178,6 +192,8 @@ export default function PostJobScreen({ navigation }: any) {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
+  const [constituency, setConstituency] = useState('');
+  const [isPincodeLoading, setIsPincodeLoading] = useState(false);
   const [stateName, setStateName] = useState('');
   const [districtName, setDistrictName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -364,15 +380,109 @@ export default function PostJobScreen({ navigation }: any) {
 
   const [activeModal, setActiveModal] = useState<'' | 'category' | 'jobType' | 'salaryType' | 'location'>('');
   const [isTopVisibility, setIsTopVisibility] = useState(false);
+  const [topVisibilityPrice, setTopVisibilityPrice] = useState(99);
   const [isUrgentHiring, setIsUrgentHiring] = useState(false);
   const [searchDistrictQuery, setSearchDistrictQuery] = useState('');
   const [selectedState, setSelectedState] = useState<'Andhra Pradesh' | 'Telangana' | null>(null);
 
+  // Dynamic pricing listener for Top Visibility from Admin (service_pricing config)
+  React.useEffect(() => {
+    const unsubPricing = onSnapshot(doc(db, 'config', 'service_pricing'), (snapshot) => {
+      if (snapshot.exists()) {
+        const pData = snapshot.data();
+        const price = pData.jobTopVisibilityPrice ?? pData.jobsTopVisibilityPrice ?? pData.topVisibilityPrice ?? 99;
+        setTopVisibilityPrice(Number(price) || 99);
+      }
+    }, (err) => console.warn('Dynamic pricing fetch error in PostJobScreen:', err));
+    return () => unsubPricing();
+  }, []);
 
+
+
+  const handlePincodeChange = async (text: string) => {
+    const cleanPin = text.replace(/[^0-9]/g, '').slice(0, 6);
+    setPincode(cleanPin);
+
+    if (cleanPin.length === 6) {
+      // 1. Check local PINCODES dataset
+      const localMatch = PINCODES.find((p: any) => p.pincode === cleanPin);
+      if (localMatch) {
+        if (localMatch.area && localMatch.area !== 'Telangana' && localMatch.area !== 'Andhra Pradesh') {
+          setConstituency(localMatch.area);
+        } else if (localMatch.city) {
+          setConstituency(localMatch.city);
+        }
+
+        if (localMatch.city) {
+          const matchedDistrict = ALL_LOCATIONS.find(
+            d => d.toLowerCase() === localMatch.city.toLowerCase() || localMatch.city.toLowerCase().includes(d.toLowerCase())
+          );
+          if (matchedDistrict) {
+            setDistrictName(matchedDistrict);
+            const isAP = AP_DISTRICTS.includes(matchedDistrict);
+            const st = isAP ? 'Andhra Pradesh' : 'Telangana';
+            setStateName(st);
+            setLocation(`${matchedDistrict}, ${isAP ? 'AP' : 'Telangana'}`);
+          }
+        }
+      }
+
+      // 2. Query India Post API for official block/constituency/district
+      try {
+        setIsPincodeLoading(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://api.postalpincode.in/pincode/${cleanPin}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        const data = await res.json();
+
+        if (Array.isArray(data) && data[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
+          const po = data[0].PostOffice[0];
+          const derivedConstituency = (po.Block && po.Block !== 'NA') ? po.Block :
+            (po.Taluk && po.Taluk !== 'NA') ? po.Taluk : po.Name;
+          if (derivedConstituency) {
+            setConstituency(derivedConstituency);
+          }
+
+          let apiState = po.State || '';
+          if (apiState.toLowerCase().includes('andhra')) apiState = 'Andhra Pradesh';
+          else if (apiState.toLowerCase().includes('telangana')) apiState = 'Telangana';
+          if (apiState) setStateName(apiState);
+
+          const apiDistrict = po.District || '';
+          const matchedDist = ALL_LOCATIONS.find(
+            d => d.toLowerCase() === apiDistrict.toLowerCase() || apiDistrict.toLowerCase().includes(d.toLowerCase())
+          );
+          const finalDist = matchedDist || apiDistrict;
+          if (finalDist) {
+            setDistrictName(finalDist);
+            const stShort = apiState === 'Andhra Pradesh' ? 'AP' : (apiState === 'Telangana' ? 'Telangana' : apiState);
+            setLocation(`${finalDist}, ${stShort}`);
+          }
+        }
+      } catch (err) {
+        // Handled silently
+      } finally {
+        setIsPincodeLoading(false);
+      }
+    }
+  };
 
   const handlePostJob = async () => {
-    if (!title || !category || !location || !salary || !description || !qualification || !company || !jobType || !contactNumber || !whatsappNumber || !address) {
-      Alert.alert('Missing Details', 'Please fill in all the required fields (including Full Address, Call Contact Number and WhatsApp Number) to continue.');
+    if (!title || !category || !location || !minSalary.trim() || !description || !qualification || !company || !jobType || !contactNumber || !whatsappNumber || !address || !pincode.trim() || !constituency.trim()) {
+      Alert.alert('Missing Details', 'Please fill in all the required fields (including Minimum Salary, Pincode, Constituency, Full Address, Call Contact Number and WhatsApp Number) to continue.');
+      return;
+    }
+
+    if (pincode.trim().length !== 6) {
+      Alert.alert('Invalid Pincode', 'Please enter a valid 6-digit postal pincode.');
+      return;
+    }
+
+    if (maxSalaryNum > 0 && maxSalaryNum < minSalaryNum) {
+      Alert.alert('Invalid Salary Range', 'Maximum salary cannot be less than minimum salary.');
       return;
     }
 
@@ -547,17 +657,28 @@ export default function PostJobScreen({ navigation }: any) {
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + 30);
 
+      const formattedSalary = maxSalaryNum > 0
+        ? `₹${minSalaryNum.toLocaleString()} - ₹${maxSalaryNum.toLocaleString()}`
+        : `₹${minSalaryNum.toLocaleString()}`;
+
       const jobDocRef = await addDoc(collection(db, 'jobs'), {
         title,
         category,
         jobType,
         location,
-        address,
-        pincode,
+        district: districtName,
+        state: stateName,
+        constituency: constituency.trim(),
+        address: address.trim(),
+        pincode: pincode.trim(),
         contactNumber: contactNumber.trim(),
         whatsappNumber: whatsappNumber.trim(),
-        salary,
+        salary: formattedSalary,
+        minSalary: minSalaryNum,
+        maxSalary: maxSalaryNum > 0 ? maxSalaryNum : null,
         salaryType,
+        isPremiumJobSeekerOnly: isMinOver20k,
+        requiresPremium: isMinOver20k,
         experience,
         description,
         qualification,
@@ -689,6 +810,20 @@ export default function PostJobScreen({ navigation }: any) {
               <View style={{ backgroundColor: 'white', padding: 15, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
                 <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>{title || "Job Title Preview"}</Text>
                 {company ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{company}</Text> : null}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                  {constituency ? (
+                    <View style={{ backgroundColor: '#eff6ff', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#bfdbfe' }}>
+                      <Text style={{ fontSize: 10, color: '#1d4ed8', fontWeight: '700' }}>📍 {constituency}{districtName ? `, ${districtName}` : ''}</Text>
+                    </View>
+                  ) : null}
+                  {minSalary ? (
+                    <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#a7f3d0' }}>
+                      <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>
+                        💰 ₹{minSalaryNum.toLocaleString()}{maxSalaryNum > 0 ? ` - ₹${maxSalaryNum.toLocaleString()}` : ''} / Month
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
                 
                 <View style={{ height: 1, backgroundColor: '#f1f5f9', marginVertical: 10 }} />
                 
@@ -840,6 +975,23 @@ export default function PostJobScreen({ navigation }: any) {
                   }}
                 />
 
+                {/* Pincode & Constituency */}
+                <View style={styles.row}>
+                  <View style={styles.halfWidth}>
+                    <InputField
+                      label="Pincode *" icon="mail-outline" placeholder="6-digit pincode"
+                      value={pincode} onChangeText={handlePincodeChange} keyboardType="numeric" maxLength={6}
+                      rightContent={isPincodeLoading ? <ActivityIndicator size="small" color="#2563EB" /> : null}
+                    />
+                  </View>
+                  <View style={styles.halfWidth}>
+                    <InputField
+                      label="Constituency *" icon="navigate-circle-outline" placeholder="e.g. Tirupati"
+                      value={constituency} onChangeText={setConstituency}
+                    />
+                  </View>
+                </View>
+
                 <View style={styles.row}>
                   <View style={styles.halfWidth}>
                     <InputField
@@ -855,24 +1007,56 @@ export default function PostJobScreen({ navigation }: any) {
                   </View>
                 </View>
 
-                {/* Salary Range with inner dropdown */}
+                {/* Salary Range (Min to Max) with Frequency & 20k+ Premium Seeker Banner */}
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>Salary Range <Text style={{ color: '#2563EB' }}>*</Text></Text>
-                  <View style={styles.salaryContainer}>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#64748B', marginLeft: 14, marginRight: 8 }}>₹</Text>
-                    <TextInput
-                      style={[styles.inputField, { flex: 1 }]}
-                      placeholder="e.g. ₹50,000 - ₹80,000"
-                      placeholderTextColor="#94a3b8"
-                      value={salary}
-                      onChangeText={setSalary}
-                    />
-                    <View style={styles.verticalDivider} />
-                    <TouchableOpacity style={styles.salaryTypeBtn} onPress={() => setActiveModal('salaryType')}>
-                      <Text style={styles.salaryTypeText}>{salaryType}</Text>
-                      <Ionicons name="chevron-down" size={16} color="#64748B" style={{ marginRight: 10 }} />
-                    </TouchableOpacity>
+                  <Text style={styles.inputLabel}>Salary Range (Per Month) <Text style={{ color: '#2563EB' }}>*</Text></Text>
+                  
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.subInputLabel}>Min Salary <Text style={{ color: '#2563EB' }}>*</Text></Text>
+                      <View style={styles.salaryInputBox}>
+                        <Text style={styles.rupeeSymbol}>₹</Text>
+                        <TextInput
+                          style={styles.salaryInputField}
+                          placeholder="e.g. 20000"
+                          placeholderTextColor="#94a3b8"
+                          value={minSalary}
+                          onChangeText={setMinSalary}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.subInputLabel}>Max Salary <Text style={{ color: '#64748B', fontSize: 10 }}>(Optional)</Text></Text>
+                      <View style={styles.salaryInputBox}>
+                        <Text style={styles.rupeeSymbol}>₹</Text>
+                        <TextInput
+                          style={styles.salaryInputField}
+                          placeholder="e.g. 35000"
+                          placeholderTextColor="#94a3b8"
+                          value={maxSalary}
+                          onChangeText={setMaxSalary}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    </View>
                   </View>
+
+                  {/* 20k+ Premium Job Seeker Banner */}
+                  {isMinOver20k && (
+                    <View style={styles.premiumSeekerBanner}>
+                      <Ionicons name="shield-checkmark" size={18} color="#059669" style={{ marginRight: 8, marginTop: 2 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.premiumSeekerTitle}>
+                          Premium Job Seeker Exclusive (₹20,000+)
+                        </Text>
+                        <Text style={styles.premiumSeekerDesc}>
+                          Since the minimum salary is ₹{minSalaryNum.toLocaleString()} (₹20,000 or more), this job will be unlocked for Premium Job Seekers!
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
 
                 {/* Contact numbers row */}
@@ -1064,93 +1248,124 @@ export default function PostJobScreen({ navigation }: any) {
 
 
 
-      {/* Reusable Dropdown Modal */}
-      <Modal visible={activeModal !== ''} animationType="slide" transparent={true}>
+      {/* Reusable Dropdown Modal (Centered Popup) */}
+      <Modal visible={activeModal !== ''} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            activeOpacity={1} 
+            onPress={() => {
+              setActiveModal('');
+              setSelectedState(null);
+              setSearchDistrictQuery('');
+            }} 
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {activeModal === 'location' && selectedState !== null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                {activeModal === 'location' && selectedState !== null ? (
                   <TouchableOpacity
                     onPress={() => {
                       setSelectedState(null);
                       setSearchDistrictQuery('');
                     }}
-                    style={{ marginRight: 4, padding: 4 }}
+                    style={styles.modalBackBtn}
                   >
-                    <Ionicons name="arrow-back" size={24} color="#0035a0" />
+                    <Ionicons name="arrow-back" size={18} color="#1e293b" />
                   </TouchableOpacity>
+                ) : (
+                  <View style={styles.modalIconBadge}>
+                    <Ionicons 
+                      name={activeModal === 'location' ? 'location-sharp' : activeModal === 'category' ? 'grid' : 'briefcase'} 
+                      size={18} 
+                      color="#2563EB" 
+                    />
+                  </View>
                 )}
-                <Text style={styles.modalTitle}>
-                  {activeModal === 'location'
-                    ? (selectedState === null ? 'Select State' : `${selectedState} Districts`)
-                    : `Select ${activeModal === 'category' ? 'Category' : activeModal === 'jobType' ? 'Job Type' : 'Salary Type'}`
-                  }
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    {activeModal === 'location'
+                      ? (selectedState === null ? 'Select State' : `${selectedState} Districts`)
+                      : `Select ${activeModal === 'category' ? 'Category' : activeModal === 'jobType' ? 'Job Type' : 'Option'}`
+                    }
+                  </Text>
+                  <Text style={styles.modalSubtitle} numberOfLines={1}>
+                    {activeModal === 'location'
+                      ? (selectedState === null ? 'Choose your job location' : `Select district in ${selectedState}`)
+                      : 'Choose an option to continue'
+                    }
+                  </Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={() => {
-                setActiveModal('');
-                setSelectedState(null);
-                setSearchDistrictQuery('');
-              }}>
-                <Ionicons name="close-circle" size={32} color="#94a3b8" />
+              <TouchableOpacity 
+                style={styles.modalCloseBtn}
+                onPress={() => {
+                  setActiveModal('');
+                  setSelectedState(null);
+                  setSearchDistrictQuery('');
+                }}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
+
+            <View style={styles.modalHeaderDivider} />
 
             {activeModal === 'location' && selectedState === null ? (
               /* Region Selection Screen */
               <View style={styles.stateSelectionContainer}>
-                <Text style={styles.stateHelpText}>Select a region to choose the exact location:</Text>
                 <View style={styles.stateCardsColumn}>
                   {/* Andhra Pradesh */}
                   <TouchableOpacity
-                    style={[styles.stateWideCard, { borderColor: '#9dbff2', backgroundColor: '#f0f5fc' }]}
-                    activeOpacity={0.8}
+                    style={[styles.stateWideCard, { borderColor: '#bfdbfe', backgroundColor: '#f8fafc' }]}
+                    activeOpacity={0.7}
                     onPress={() => setSelectedState('Andhra Pradesh')}
                   >
-                    <View style={[styles.stateWideIconBox, { backgroundColor: '#0035a0' }]}>
-                      <Ionicons name="map" size={24} color="white" />
+                    <View style={[styles.stateWideIconBox, { backgroundColor: '#2563EB' }]}>
+                      <Ionicons name="map" size={22} color="white" />
                     </View>
                     <View style={styles.stateWideTextContent}>
                       <Text style={styles.stateWideTitle}>Andhra Pradesh</Text>
-                      <Text style={styles.stateWideSub}>Explore 26 Districts</Text>
+                      <Text style={styles.stateWideSub}>26 Districts</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#0035a0" />
+                    <Ionicons name="chevron-forward" size={18} color="#2563EB" />
                   </TouchableOpacity>
 
                   {/* Telangana */}
                   <TouchableOpacity
-                    style={[styles.stateWideCard, { borderColor: '#ddd6fe', backgroundColor: '#f5f3ff' }]}
-                    activeOpacity={0.8}
+                    style={[styles.stateWideCard, { borderColor: '#ddd6fe', backgroundColor: '#f8fafc' }]}
+                    activeOpacity={0.7}
                     onPress={() => setSelectedState('Telangana')}
                   >
                     <View style={[styles.stateWideIconBox, { backgroundColor: '#7c3aed' }]}>
-                      <Ionicons name="location" size={24} color="white" />
+                      <Ionicons name="location" size={22} color="white" />
                     </View>
                     <View style={styles.stateWideTextContent}>
                       <Text style={styles.stateWideTitle}>Telangana</Text>
-                      <Text style={styles.stateWideSub}>Explore 33 Districts</Text>
+                      <Text style={styles.stateWideSub}>33 Districts</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#7c3aed" />
+                    <Ionicons name="chevron-forward" size={18} color="#7c3aed" />
                   </TouchableOpacity>
 
                   {/* Bangalore (Direct Select) */}
                   <TouchableOpacity
-                    style={[styles.stateWideCard, { borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' }]}
-                    activeOpacity={0.8}
+                    style={[styles.stateWideCard, { borderColor: '#bbf7d0', backgroundColor: '#f8fafc' }]}
+                    activeOpacity={0.7}
                     onPress={() => {
                       setLocation('Bangalore, Karnataka');
+                      setStateName('Karnataka');
+                      setDistrictName('Bangalore');
                       setActiveModal('');
                     }}
                   >
-                    <View style={[styles.stateWideIconBox, { backgroundColor: '#16a34a' }]}>
-                      <Ionicons name="business" size={24} color="white" />
+                    <View style={[styles.stateWideIconBox, { backgroundColor: '#059669' }]}>
+                      <Ionicons name="business" size={22} color="white" />
                     </View>
                     <View style={styles.stateWideTextContent}>
                       <Text style={styles.stateWideTitle}>Bangalore</Text>
                       <Text style={styles.stateWideSub}>Karnataka (Direct Select)</Text>
                     </View>
-                    <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
+                    <Ionicons name="checkmark-circle" size={20} color="#059669" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1158,15 +1373,20 @@ export default function PostJobScreen({ navigation }: any) {
               /* Normal FlatList (Categories, JobTypes, or Filtered Districts based on State) */
               <>
                 {activeModal === 'location' && selectedState !== null && (
-                  <View style={[styles.searchContainer, { marginHorizontal: 0, marginBottom: 15 }]}>
-                    <Ionicons name="search" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
+                  <View style={styles.modalSearchContainer}>
+                    <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
                     <TextInput
-                      style={{ flex: 1, fontSize: 14, color: '#1e293b', paddingVertical: 4 }}
-                      placeholder={`Search in ${selectedState}...`}
+                      style={{ flex: 1, fontSize: 13, color: '#1e293b', paddingVertical: 2 }}
+                      placeholder={`Search ${selectedState} district...`}
                       placeholderTextColor="#94a3b8"
                       value={searchDistrictQuery}
                       onChangeText={setSearchDistrictQuery}
                     />
+                    {searchDistrictQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setSearchDistrictQuery('')}>
+                        <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 
@@ -1312,6 +1532,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     height: 48
   },
+  subInputLabel: { fontSize: 11, fontWeight: '700', color: '#475569', marginBottom: 4 },
+  salaryInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    height: 48,
+    paddingHorizontal: 10,
+  },
+  rupeeSymbol: { fontSize: 16, fontWeight: '800', color: '#64748b', marginRight: 4 },
+  salaryInputField: { flex: 1, fontSize: 13, color: '#1e293b', fontWeight: '600' },
+  salaryTypeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 2,
+  },
+  salaryTypeSelectorLabel: { fontSize: 11, fontWeight: '600', color: '#64748b' },
+  salaryTypeSelectorValue: { fontSize: 12, fontWeight: '800', color: '#1e293b' },
+  premiumSeekerBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 10,
+  },
+  premiumSeekerTitle: { fontSize: 12, fontWeight: '800', color: '#065f46', marginBottom: 2 },
+  premiumSeekerDesc: { fontSize: 11, color: '#047857', lineHeight: 15 },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1403,34 +1662,73 @@ const styles = StyleSheet.create({
   footerLinkText: { fontSize: 10, color: '#64748b', fontWeight: '600' },
   footerLinkDot: { fontSize: 10, color: '#cbd5e1' },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  modalTitle: { fontSize: 16, fontWeight: '900', color: '#1e293b' },
-  modalItem: { paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#f8fafc', flexDirection: 'row', justifyContent: 'space-between' },
-  modalItemText: { fontSize: 13, color: '#334155', fontWeight: '600' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    padding: 20,
+    maxHeight: '82%',
+    width: '100%',
+    maxWidth: 390,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  modalIconBadge: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  modalTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', letterSpacing: -0.2 },
+  modalSubtitle: { fontSize: 11, color: '#64748b', fontWeight: '500', marginTop: 1 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  modalBackBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  modalHeaderDivider: { height: 1, backgroundColor: '#f1f5f9', marginBottom: 14, marginHorizontal: -4 },
+  modalSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  modalItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalItemText: { fontSize: 14, color: '#1e293b', fontWeight: '600' },
 
-  stateSelectionContainer: { paddingVertical: 10 },
-  stateHelpText: { fontSize: 11, color: '#64748b', fontWeight: '600', marginBottom: 16 },
-  stateCardsColumn: { flexDirection: 'column', gap: 14 },
+  stateSelectionContainer: { paddingVertical: 2 },
+  stateCardsColumn: { flexDirection: 'column', gap: 10 },
   stateWideCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
   stateWideIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   stateWideTextContent: { flex: 1 },
-  stateWideTitle: { fontSize: 16, fontWeight: '900', color: '#1e293b', marginBottom: 4 },
-  stateWideSub: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  stateWideTitle: { fontSize: 15, fontWeight: '800', color: '#0f172a', marginBottom: 2 },
+  stateWideSub: { fontSize: 11, color: '#64748b', fontWeight: '600' },
 
   featureGrid: {
     flexDirection: 'row',

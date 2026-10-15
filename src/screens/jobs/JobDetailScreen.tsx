@@ -550,9 +550,25 @@ const JobDetailScreen = () => {
 
   // Salary Gate: Monthly salary >= 20,000
   const isSalaryOver20k = () => {
-    if (!job || !job.salary) return false;
+    if (!job) return false;
+    if (job.isPremiumJobSeekerOnly === true || job.requiresPremium === true) return true;
+    if (job.minSalary !== undefined && job.minSalary !== null && !isNaN(Number(job.minSalary))) {
+      return Number(job.minSalary) >= 20000;
+    }
+    if (!job.salary) return false;
     try {
-      const cleanString = job.salary.toString().replace(/[^0-9]/g, '');
+      const salStr = job.salary.toString().toLowerCase();
+      const rangeMatch = salStr.match(/^₹?\s*(\d+[\d,]*)\s*(?:k)?\s*[-–to]/i);
+      if (rangeMatch) {
+        let minVal = parseInt(rangeMatch[1].replace(/,/g, ''), 10);
+        if (salStr.includes('k') && minVal < 1000) minVal *= 1000;
+        return minVal >= 20000;
+      }
+      const kMatch = salStr.match(/(\d+)\s*k/);
+      if (kMatch) {
+        return parseInt(kMatch[1], 10) * 1000 >= 20000;
+      }
+      const cleanString = salStr.replace(/[^0-9]/g, '');
       const salaryNum = parseInt(cleanString, 10);
       if (isNaN(salaryNum)) return false;
       return salaryNum >= 20000;
@@ -843,7 +859,9 @@ const JobDetailScreen = () => {
         <View style={styles.inlineHighlightsRow}>
           <View style={styles.inlineHighlightItem}>
             <Ionicons name="location-outline" size={14} color="#64748B" />
-            <Text style={styles.inlineHighlightText}>{job.location || "Bangalore, India"}</Text>
+            <Text style={styles.inlineHighlightText}>
+              {job.constituency ? `${job.constituency}, ${job.district || job.location}` : (job.location || "Bangalore, India")}
+            </Text>
           </View>
           <View style={styles.inlineHighlightItem}>
             <Ionicons name="briefcase-outline" size={14} color="#64748B" />
@@ -851,7 +869,17 @@ const JobDetailScreen = () => {
           </View>
           <View style={styles.inlineHighlightItem}>
             <Ionicons name="wallet-outline" size={14} color="#64748B" />
-            <Text style={styles.inlineHighlightText}>{job.salary || "₹ 6 - 10 LPA"}</Text>
+            <Text style={styles.inlineHighlightText}>
+              {(() => {
+                if (job.minSalary && job.maxSalary) {
+                  return `₹${Number(job.minSalary).toLocaleString()} - ₹${Number(job.maxSalary).toLocaleString()}${job.salaryType ? ` / ${job.salaryType.replace('Per ', '')}` : ' / Month'}`;
+                }
+                if (job.minSalary) {
+                  return `₹${Number(job.minSalary).toLocaleString()}+${job.salaryType ? ` / ${job.salaryType.replace('Per ', '')}` : ' / Month'}`;
+                }
+                return job.salary || "₹ 6 - 10 LPA";
+              })()}
+            </Text>
           </View>
           {job.vacancies ? (
             <View style={styles.inlineHighlightItem}>
@@ -868,17 +896,35 @@ const JobDetailScreen = () => {
         </View>
 
         {/* Full Address Highlight Box right below Posted Recently */}
-        {job.address ? (
+        {(job.address || job.constituency || job.pincode) ? (
           <View style={{ paddingHorizontal: 20, marginTop: 12, marginBottom: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#EFF6FF', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', gap: 8 }}>
               <Ionicons name="location-sharp" size={18} color="#2563EB" style={{ marginTop: 1 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E40AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
-                  Full Job Address / Location
+                  Full Job Address & Location
                 </Text>
-                <Text style={{ fontSize: 13, color: '#1E293B', fontWeight: '600', lineHeight: 19 }}>
-                  {job.address}
-                </Text>
+                {job.address ? (
+                  <Text style={{ fontSize: 13, color: '#1E293B', fontWeight: '600', lineHeight: 19 }}>
+                    {job.address}
+                  </Text>
+                ) : null}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {job.constituency ? (
+                    <View style={{ backgroundColor: '#DBEAFE', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E40AF' }}>
+                        Constituency: {job.constituency}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {job.pincode ? (
+                    <View style={{ backgroundColor: '#DBEAFE', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E40AF' }}>
+                        Pincode: {job.pincode}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
             </View>
           </View>

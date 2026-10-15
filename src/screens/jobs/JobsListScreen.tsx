@@ -210,9 +210,20 @@ export default function JobsListScreen({ route, navigation }: any) {
     const isPremium = seekerPlanActive && seekerPlanExpiry && (seekerPlanExpiry.toDate ? seekerPlanExpiry.toDate() : new Date(seekerPlanExpiry)) > new Date();
 
     const isSalaryOver20k = () => {
-      if (!clickedJob || !clickedJob.salary) return false;
+      if (!clickedJob) return false;
+      if (clickedJob.isPremiumJobSeekerOnly === true || clickedJob.requiresPremium === true) return true;
+      if (clickedJob.minSalary !== undefined && clickedJob.minSalary !== null && !isNaN(Number(clickedJob.minSalary))) {
+        return Number(clickedJob.minSalary) >= 20000;
+      }
+      if (!clickedJob.salary) return false;
       try {
         const salStr = clickedJob.salary.toString().toLowerCase();
+        const rangeMatch = salStr.match(/^₹?\s*(\d+[\d,]*)\s*(?:k)?\s*[-–to]/i);
+        if (rangeMatch) {
+          let minVal = parseInt(rangeMatch[1].replace(/,/g, ''), 10);
+          if (salStr.includes('k') && minVal < 1000) minVal *= 1000;
+          return minVal >= 20000;
+        }
         const kMatch = salStr.match(/(\d+)\s*k/);
         if (kMatch) {
           return parseInt(kMatch[1], 10) * 1000 >= 20000;
@@ -432,10 +443,10 @@ export default function JobsListScreen({ route, navigation }: any) {
       } else if (filterCategory === 'state govt') {
         matchesCategory = jobCategory.includes('state') && !jobCategory.includes('central');
       } else if (filterCategory === 'all govt' || (isGovernmentCategory && (filterCategory === 'all categories' || filterCategory === 'all jobs'))) {
-        matchesCategory = jobCategory.includes('central') || 
-                          jobCategory.includes('state') || 
-                          jobCategory.includes('govt') || 
-                          jobCategory.includes('government');
+        matchesCategory = jobCategory.includes('central') ||
+          jobCategory.includes('state') ||
+          jobCategory.includes('govt') ||
+          jobCategory.includes('government');
       } else if (filterCategory === 'private jobs') {
         matchesCategory = job.source === 'User' || jobCategory.includes('private') || (!jobCategory.includes('govt') && !jobCategory.includes('central') && !jobCategory.includes('state'));
       } else if (!matchesCategory) {
@@ -769,7 +780,7 @@ export default function JobsListScreen({ route, navigation }: any) {
 
         {/* Info (i) Button for Government Jobs */}
         {isGovernmentCategory && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.infoBtn}
             onPress={() => navigation.navigate('GovtJobInfo')}
             activeOpacity={0.7}
@@ -925,9 +936,9 @@ export default function JobsListScreen({ route, navigation }: any) {
       {/* Warning Alert Banner for Private Jobs */}
       {isPrivateCategory && (
         <View style={styles.warningBanner}>
-          <Ionicons name="alert-circle" size={18} color="#B45309" style={{ marginRight: 6 }} />
+          <Ionicons name="alert-circle" size={18} color="#059669" style={{ marginRight: 6 }} />
           <Text style={styles.warningBannerText}>
-            Please don't pay any money for the job. Beware of scam fraudulent offers!
+            Please do not pay any money to get a job through this app. Beware of fake job offers and fraudulent recruiters !
           </Text>
         </View>
       )}
@@ -983,38 +994,68 @@ export default function JobsListScreen({ route, navigation }: any) {
         }
       />
 
-      {/* Filter Selection Modal */}
-      <Modal visible={filterModal !== ''} animationType="slide" transparent={true}>
+      {/* Filter Selection Modal (Centered Popup) */}
+      <Modal visible={filterModal !== ''} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              setFilterModal('');
+              setSelectedState(null);
+              setSearchDistrictQuery('');
+            }}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {filterModal === 'location' && selectedState !== null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                {filterModal === 'location' && selectedState !== null ? (
                   <TouchableOpacity
                     onPress={() => {
                       setSelectedState(null);
                       setSearchDistrictQuery('');
                     }}
-                    style={{ marginRight: 4, padding: 4 }}
+                    style={styles.modalBackBtn}
                   >
-                    <Ionicons name="arrow-back" size={24} color="#0035a0" />
+                    <Ionicons name="arrow-back" size={18} color="#1e293b" />
                   </TouchableOpacity>
+                ) : (
+                  <View style={styles.modalIconBadge}>
+                    <Ionicons
+                      name={filterModal === 'location' ? 'location-sharp' : filterModal === 'category' ? 'grid' : 'options'}
+                      size={18}
+                      color="#2563EB"
+                    />
+                  </View>
                 )}
-                <Text style={styles.modalTitle}>
-                  {filterModal === 'location'
-                    ? (selectedState === null ? 'Select State' : `${selectedState} Districts`)
-                    : `Select ${filterModal === 'category' ? 'Job Category' : filterModal === 'type' ? 'Job Type' : 'Experience'}`
-                  }
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    {filterModal === 'location'
+                      ? (selectedState === null ? 'Select State' : `${selectedState} Districts`)
+                      : `Select ${filterModal === 'category' ? 'Job Category' : filterModal === 'type' ? 'Job Type' : 'Experience'}`
+                    }
+                  </Text>
+                  <Text style={styles.modalSubtitle} numberOfLines={1}>
+                    {filterModal === 'location'
+                      ? (selectedState === null ? 'Filter jobs by state or region' : `Select district in ${selectedState}`)
+                      : 'Choose an option to filter jobs'
+                    }
+                  </Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={() => {
-                setFilterModal('');
-                setSelectedState(null);
-                setSearchDistrictQuery('');
-              }}>
-                <Ionicons name="close-circle" size={32} color="#94a3b8" />
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => {
+                  setFilterModal('');
+                  setSelectedState(null);
+                  setSearchDistrictQuery('');
+                }}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
+
+            <View style={styles.modalHeaderDivider} />
 
             {filterModal === 'location' && selectedState === null ? (
               /* Region Selection Screen */
@@ -1578,10 +1619,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  modalTitle: { fontSize: 18, fontWeight: '900', color: '#1e293b' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    padding: 20,
+    maxHeight: '82%',
+    width: '100%',
+    maxWidth: 390,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  modalIconBadge: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  modalTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', letterSpacing: -0.2 },
+  modalSubtitle: { fontSize: 11, color: '#64748b', fontWeight: '500', marginTop: 1 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  modalBackBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  modalHeaderDivider: { height: 1, backgroundColor: '#f1f5f9', marginBottom: 14, marginHorizontal: -4 },
   modalSearchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1590,36 +1656,40 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 15
+    paddingVertical: 8,
+    marginBottom: 12
   },
-  modalSearchInput: { flex: 1, fontSize: 14, color: '#1e293b' },
-  modalItem: { paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#f8fafc', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalSearchInput: { flex: 1, fontSize: 13, color: '#1e293b' },
+  modalItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   selectedModalItem: { backgroundColor: '#f0f5fc', borderRadius: 8, paddingHorizontal: 10 },
-  modalItemText: { fontSize: 15, color: '#334155', fontWeight: '600' },
+  modalItemText: { fontSize: 14, color: '#334155', fontWeight: '600' },
   selectedModalItemText: { color: '#0035a0', fontWeight: 'bold' },
 
-  stateSelectionContainer: { paddingVertical: 10 },
-  stateHelpText: { fontSize: 14, color: '#64748b', fontWeight: '600', marginBottom: 16 },
-  stateCardsColumn: { flexDirection: 'column', gap: 14 },
+  stateSelectionContainer: { paddingVertical: 2 },
+  stateHelpText: { fontSize: 12, color: '#64748b', fontWeight: '600', marginBottom: 12 },
+  stateCardsColumn: { flexDirection: 'column', gap: 10 },
   stateWideCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
   stateWideIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   stateWideTextContent: { flex: 1 },
-  stateWideTitle: { fontSize: 16, fontWeight: '900', color: '#1e293b', marginBottom: 4 },
-  stateWideSub: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  stateWideTitle: { fontSize: 15, fontWeight: '800', color: '#1e293b', marginBottom: 2 },
+  stateWideSub: { fontSize: 11, color: '#64748b', fontWeight: '600' },
 
   allLocationsBtn: {
     flexDirection: 'row',
@@ -1724,8 +1794,8 @@ const styles = StyleSheet.create({
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 8,
@@ -1736,8 +1806,8 @@ const styles = StyleSheet.create({
   },
   warningBannerText: {
     fontSize: 12,
-    color: '#92400E',
-    fontWeight: '500',
+    color: '#065f46',
+    fontWeight: '600',
     flex: 1,
   },
 });

@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   FlatList,
   Linking,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import { ALL_PRODUCTS } from '../../data/products';
 import { LinearGradient } from 'expo-linear-gradient';
 import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
+import leadService from '../../services/lead.service';
 
 const { width } = Dimensions.get('window');
 const PRIMARY_COLOR = '#2563EB';
@@ -248,13 +250,45 @@ export default function ProductsScreen({ route, navigation }: any) {
         <View style={styles.vendorActions}>
           <TouchableOpacity
             style={styles.vendorCallBtn}
-            onPress={() => Linking.openURL(`tel:${item.phone}`)}
+            onPress={() => {
+              const businessName = item.businessName || 'this business';
+              Alert.alert(
+                'Confirm Call',
+                `Do you want to call ${businessName}?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      leadService.recordCall(item);
+                      Linking.openURL(`tel:${item.phone}`);
+                    },
+                  },
+                ]
+              );
+            }}
           >
             <Ionicons name="call" size={16} color="white" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.vendorWaBtn}
-            onPress={() => Linking.openURL(`whatsapp://send?phone=${item.phone}`)}
+            onPress={() => {
+              const businessName = item.businessName || 'this business';
+              Alert.alert(
+                'Open WhatsApp',
+                `Do you want to chat with ${businessName} on WhatsApp?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      leadService.recordWhatsApp(item);
+                      Linking.openURL(`whatsapp://send?phone=${item.phone}`);
+                    },
+                  },
+                ]
+              );
+            }}
           >
             <Ionicons name="logo-whatsapp" size={16} color="white" />
           </TouchableOpacity>

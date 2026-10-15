@@ -217,13 +217,39 @@ export default function BusinessListScreen({ route, navigation }: any) {
   };
 
   const handleCall = (item: any) => {
-    leadService.recordCall(item);
-    Linking.openURL(`tel:${item.phone}`);
+    const businessName = item.businessName || 'this business';
+    Alert.alert(
+      'Confirm Call',
+      `Do you want to call ${businessName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            leadService.recordCall(item);
+            Linking.openURL(`tel:${item.phone}`);
+          },
+        },
+      ]
+    );
   };
 
   const handleWhatsApp = (item: any) => {
-    leadService.recordWhatsApp(item);
-    Linking.openURL(`whatsapp://send?phone=${item.phone}`);
+    const businessName = item.businessName || 'this business';
+    Alert.alert(
+      'Open WhatsApp',
+      `Do you want to chat with ${businessName} on WhatsApp?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            leadService.recordWhatsApp(item);
+            Linking.openURL(`whatsapp://send?phone=${item.phone}`);
+          },
+        },
+      ]
+    );
   };
 
   const handleMapRedirect = (item?: any) => {

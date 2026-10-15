@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { auth, db } from '../../services/firebase';
 import { collection, query, where, onSnapshot, doc, getDocs, addDoc, getDoc } from 'firebase/firestore';
 import { PINCODES } from '../../data/pincodes';
-import { ActivityIndicator, Linking } from 'react-native';
+import { ActivityIndicator, Linking, Alert } from 'react-native';
 
 
 const { width } = Dimensions.get('window');
@@ -385,6 +385,42 @@ export default function ServicesScreen({ route, navigation }: any) {
     } catch (e) { }
   };
 
+  const handleCall = (item: any) => {
+    const businessName = item.businessName || 'this business';
+    Alert.alert(
+      'Confirm Call',
+      `Do you want to call ${businessName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            logLead(item, 'call');
+            Linking.openURL(`tel:${item.phone}`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleWhatsApp = (item: any) => {
+    const businessName = item.businessName || 'this business';
+    Alert.alert(
+      'Open WhatsApp',
+      `Do you want to chat with ${businessName} on WhatsApp?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'OK',
+          onPress: () => {
+            logLead(item, 'whatsapp');
+            Linking.openURL(`whatsapp://send?phone=${item.phone}`);
+          },
+        },
+      ]
+    );
+  };
+
 
 
   const getSubKey = (sub: string) => {
@@ -567,8 +603,8 @@ export default function ServicesScreen({ route, navigation }: any) {
                       </View>
                     </View>
                     <View style={{ justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, gap: 8 }}>
-                      <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' }} onPress={() => { logLead(item, 'call'); Linking.openURL(`tel:${item.phone}`); }}><Ionicons name="call" size={16} color="white" /></TouchableOpacity>
-                      <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#16a34a', alignItems: 'center', justifyContent: 'center' }} onPress={() => { logLead(item, 'whatsapp'); Linking.openURL(`whatsapp://send?phone=${item.phone}`); }}><Ionicons name="logo-whatsapp" size={16} color="white" /></TouchableOpacity>
+                      <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' }} onPress={() => handleCall(item)}><Ionicons name="call" size={16} color="white" /></TouchableOpacity>
+                      <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#16a34a', alignItems: 'center', justifyContent: 'center' }} onPress={() => handleWhatsApp(item)}><Ionicons name="logo-whatsapp" size={16} color="white" /></TouchableOpacity>
                     </View>
                   </TouchableOpacity>
                 );
