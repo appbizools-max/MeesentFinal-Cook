@@ -6,7 +6,7 @@ buildscript {
     minSdkVersion = 24
     compileSdkVersion = 36
     targetSdkVersion = 36
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "27.1.12297006"
   }
   repositories {
     google()
@@ -31,13 +31,22 @@ allprojects {
 subprojects {
   afterEvaluate { project ->
     if (project.hasProperty("android")) {
-      project.android {
-        defaultConfig {
-          externalNativeBuild {
-            cmake {
-              cppFlags "-std=c++20", "-fexceptions", "-frtti"
-              arguments "-DANDROID_STL=c++_shared", "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"
-            }
+      def cmake = project.android.defaultConfig.externalNativeBuild.cmake
+      if (cmake != null) {
+        def requiredArgs = [
+          "-DANDROID_STL=c++_shared",
+          "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384 -lc++_shared",
+          "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"
+        ]
+        for (String arg : requiredArgs) {
+          def key = arg.split("=")[0]
+          cmake.arguments.removeAll { it.startsWith(key) }
+          cmake.arguments.add(arg)
+        }
+        def requiredFlags = ["-std=c++20", "-fexceptions", "-frtti"]
+        for (String flag : requiredFlags) {
+          if (!cmake.cppFlags.contains(flag)) {
+            cmake.cppFlags.add(flag)
           }
         }
       }

@@ -205,11 +205,31 @@ export default function ProductCatalogScreen({ navigation, route }: any) {
 
       const updateFields: any = { catalog: updatedCatalog };
 
+      // Also sync uploaded flyer / photo into the business gallery (images field)
+      if (finalImageUrl) {
+        try {
+          const vRef = doc(db, 'vendors', businessId);
+          const vSnap = await getDoc(vRef);
+          const currentData = vSnap.exists() ? vSnap.data() : (vendorData || {});
+          const currentImages: string[] = Array.isArray(currentData.images) ? [...currentData.images] : [];
+          if (!currentImages.includes(finalImageUrl)) {
+            currentImages.unshift(finalImageUrl);
+            updateFields.images = currentImages;
+          }
+        } catch (imgSyncErr) {
+          console.warn('Could not sync image to business gallery:', imgSyncErr);
+        }
+      }
+
       if (itemBrand.trim()) {
         updateFields.brand = itemBrand.trim();
       }
 
       await updateDoc(doc(db, 'vendors', businessId), updateFields);
+
+      if (updateFields.images) {
+        setVendorData((prev: any) => ({ ...prev, images: updateFields.images }));
+      }
 
       // Save brand name to 'brands' collection if specified
       if (itemBrand.trim() && vendorData) {
@@ -369,11 +389,16 @@ export default function ProductCatalogScreen({ navigation, route }: any) {
         )}
       </SafeAreaView>
 
-      {/* Add / Edit Modal Sheet */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+      {/* Add / Edit Service Modal Popup */}
+      <Modal visible={modalVisible} animationType="fade" transparent={true} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFillObject} 
+            activeOpacity={1} 
+            onPress={() => setModalVisible(false)} 
+          />
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.modalContent}
           >
             <View style={styles.modalHeader}>
@@ -655,16 +680,28 @@ const styles = StyleSheet.create({
   },
   editBadgeText: { fontSize: 9, fontWeight: '900', color: '#3b82f6' },
 
-  // Modal Sheet
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  // Modal Popup (Proper Centered Dialog)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
   modalContent: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderRadius: 26,
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 30,
-    maxHeight: '90%',
+    paddingTop: 22,
+    paddingBottom: 22,
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '88%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: '900', color: '#1e293b' },

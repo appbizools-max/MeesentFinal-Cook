@@ -263,7 +263,9 @@ const ADMIN_ID_MAP: Record<string, string> = {
   's27': 'rent_hire',
   's28': 'baby_care',
   's29': 'language_classes',
-  's30': 'bulk_comm'
+  's30': 'bulk_comm',
+  's31': 'bills',
+  's32': 'cake_shops'
 };
 
 // Listen for updates on cat_services in real-time

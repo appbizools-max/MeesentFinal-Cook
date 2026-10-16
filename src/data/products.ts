@@ -262,7 +262,22 @@ const ADMIN_ID_MAP: Record<string, string> = {
   'i27': 'prod28',
   'i28': 'prod30',
   'i29': 'prod44',
-  'i30': 'prod33'
+  'i30': 'prod33',
+  'i31': 'prod15',
+  'i32': 'prod19',
+  'i33': 'prod23',
+  'i34': 'prod24',
+  'i35': 'prod27',
+  'i36': 'prod31',
+  'i37': 'prod32',
+  'i38': 'prod34',
+  'i39': 'prod35',
+  'i40': 'prod36',
+  'i41': 'prod37',
+  'i42': 'prod38',
+  'i43': 'prod42',
+  'i44': 'prod43',
+  'i45': 'prod45'
 };
 
 try {

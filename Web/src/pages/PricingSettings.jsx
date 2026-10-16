@@ -20,6 +20,9 @@ export const PricingSettings = () => {
     jobSeekerWeeklyPassPrice: 9,
     jobSeekerMonthlyPassPrice: 29,
     jobSeekerYearlyPassPrice: 199,
+    jobTopVisibilityPrice: 99,
+    jobsTopVisibilityPrice: 99,
+    topVisibilityPrice: 99,
     jobSeekerPass: {
       weekly: 9,
       monthly: 29,
@@ -51,6 +54,9 @@ export const PricingSettings = () => {
           jobSeekerWeeklyPassPrice: data.jobSeekerWeeklyPassPrice ?? data.jobSeekerPass?.weekly ?? 9,
           jobSeekerMonthlyPassPrice: data.jobSeekerMonthlyPassPrice ?? data.jobSeekerPass?.monthly ?? 29,
           jobSeekerYearlyPassPrice: data.jobSeekerYearlyPassPrice ?? data.jobSeekerPass?.yearly ?? 199,
+          jobTopVisibilityPrice: data.jobTopVisibilityPrice ?? data.jobsTopVisibilityPrice ?? data.topVisibilityPrice ?? 99,
+          jobsTopVisibilityPrice: data.jobTopVisibilityPrice ?? data.jobsTopVisibilityPrice ?? data.topVisibilityPrice ?? 99,
+          topVisibilityPrice: data.jobTopVisibilityPrice ?? data.jobsTopVisibilityPrice ?? data.topVisibilityPrice ?? 99,
           jobSeekerPass: {
             weekly: data.jobSeekerWeeklyPassPrice ?? data.jobSeekerPass?.weekly ?? 9,
             monthly: data.jobSeekerMonthlyPassPrice ?? data.jobSeekerPass?.monthly ?? 29,
@@ -96,6 +102,9 @@ export const PricingSettings = () => {
     // Ensure sync between flat keys and nested jobSeekerPass object
     const payload = {
       ...pricing,
+      jobTopVisibilityPrice: pricing.jobTopVisibilityPrice ?? 99,
+      jobsTopVisibilityPrice: pricing.jobTopVisibilityPrice ?? 99,
+      topVisibilityPrice: pricing.jobTopVisibilityPrice ?? 99,
       jobSeekerPass: {
         weekly: pricing.jobSeekerWeeklyPassPrice ?? 9,
         monthly: pricing.jobSeekerMonthlyPassPrice ?? 29,
@@ -164,7 +173,8 @@ export const PricingSettings = () => {
           type="number"
           value={value}
           onChange={onChange}
-          className={`w-full pl-9 pr-4 py-3.5 bg-slate-50/80 border-2 ${highlight ? 'border-primary/20 focus:border-primary focus:bg-white' : 'border-slate-200 focus:border-slate-400 focus:bg-white'} rounded-2xl focus:ring-0 transition-all font-black text-slate-800 outline-none text-base shadow-inner`}
+          onWheel={(e) => e.currentTarget.blur()}
+          className={`w-full pl-9 pr-4 py-3.5 bg-slate-50/80 border-2 ${highlight ? 'border-primary/20 focus:border-primary focus:bg-white' : 'border-slate-200 focus:border-slate-400 focus:bg-white'} rounded-2xl focus:ring-0 transition-all font-black text-slate-800 outline-none text-base shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
         />
       </div>
     </div>
@@ -273,7 +283,7 @@ export const PricingSettings = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
             {/* Jobs Seeker Verification */}
             <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden relative flex flex-col justify-between">
@@ -386,6 +396,38 @@ export const PricingSettings = () => {
                     onChange={(e) => {
                       const val = parseInt(e.target.value) || 0;
                       setPricing({...pricing, jobsPincodeAdMonthly: val, jobsPincodeAdPrice: val});
+                    }}
+                    highlight={true}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Job Top Visibility Upgrade Price (New) */}
+            <div className="bg-white rounded-[32px] border-2 border-blue-400/40 shadow-md shadow-blue-500/5 overflow-hidden relative flex flex-col justify-between">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+              <div className="p-7 flex flex-col gap-6 relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0">
+                    <Zap className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">Top Visibility Upgrade</h3>
+                    <p className="text-xs font-bold text-blue-600 mt-0.5 uppercase tracking-wider bg-blue-50 inline-block px-2 py-0.5 rounded-full border border-blue-200/60">Employer 30-Day Boost</p>
+                  </div>
+                </div>
+                <div>
+                  <InputField 
+                    label="Top Visibility Fee (₹/month)" 
+                    value={pricing.jobTopVisibilityPrice ?? pricing.jobsTopVisibilityPrice ?? pricing.topVisibilityPrice ?? 99} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setPricing({
+                        ...pricing, 
+                        jobTopVisibilityPrice: val,
+                        jobsTopVisibilityPrice: val,
+                        topVisibilityPrice: val
+                      });
                     }}
                     highlight={true}
                   />

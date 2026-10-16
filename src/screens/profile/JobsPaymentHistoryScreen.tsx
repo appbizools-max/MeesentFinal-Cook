@@ -59,46 +59,7 @@ export default function JobsPaymentHistoryScreen({ navigation }: any) {
         return dateB - dateA;
       });
 
-      // If no payments exist, add mock payment history data for demonstration
-      if (sortedPayments.length === 0) {
-        setPayments([
-          {
-            id: 'mock_job_1',
-            paymentId: 'PAY-830291',
-            description: 'Pincode Ad Campaign (Weekly Plan)',
-            amount: 297,
-            plan: 'week',
-            pincodeCount: 3,
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000 * 2).toISOString(), // 2 days ago
-            status: 'success',
-            paymentMethod: 'UPI (PhonePe)'
-          },
-          {
-            id: 'mock_job_2',
-            paymentId: 'PAY-749102',
-            description: 'Pincode Ad Campaign (Monthly Plan)',
-            amount: 99,
-            plan: 'month',
-            pincodeCount: 1,
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000 * 12).toISOString(), // 12 days ago
-            status: 'success',
-            paymentMethod: 'Netbanking (SBI)'
-          },
-          {
-            id: 'mock_job_3',
-            paymentId: 'PAY-F92812',
-            description: 'Pincode Ad Campaign (Weekly Plan) - Failed',
-            amount: 297,
-            plan: 'week',
-            pincodeCount: 3,
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000 * 18).toISOString(), // 18 days ago
-            status: 'failed',
-            paymentMethod: 'UPI (GPay)'
-          }
-        ]);
-      } else {
-        setPayments(sortedPayments);
-      }
+      setPayments(sortedPayments);
     } catch (error) {
       console.error('Error fetching payments:', error);
     } finally {

@@ -76,9 +76,9 @@ class AuthService {
           isActive: true,
           isSuspended: false,
           subscriptionPlan: {
-            planId: 'free',
-            status: 'active',
-            startDate: serverTimestamp(),
+            planId: 'none',
+            status: 'inactive',
+            startDate: null,
           },
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),

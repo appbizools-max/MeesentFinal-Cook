@@ -87,7 +87,7 @@ export default function RootNavigator() {
 
         if (notifId !== lastNotifiedId && notifData && notifData.title && notifData.body) {
           lastNotifiedId = notifId;
-          notificationService.sendLocalNotification(notifData.title, notifData.body);
+          notificationService.sendLocalNotification(notifData.title, notifData.body, notifData);
         }
       }, (err) => {
         console.warn("Real-time notification listener notice:", err?.message);
@@ -122,7 +122,7 @@ export default function RootNavigator() {
           if (cat.includes('Central') || cat.includes('State') || cat.includes('Govt')) {
             const titleText = cat.includes('Central') ? 'Central Govt Alert' : cat.includes('State') ? 'State Govt Alert' : `${cat} Alert`;
             const bodyText = `${jobData.title || 'New Job'} Announced. Tap to apply on Meesent!`;
-            notificationService.sendLocalNotification(titleText, bodyText);
+            notificationService.sendLocalNotification(titleText, bodyText, { ...jobData, module: 'jobs' });
           }
         }
       }, (err) => {
@@ -169,6 +169,8 @@ export default function RootNavigator() {
                   const body = notifData.body || notifData.message || 'Someone viewed your business profile. Tap to check My Leads!';
                   notificationService.sendLocalNotification(title, body, {
                     ...notifData,
+                    module: 'services',
+                    isService: true,
                     screen: notifData.screen || 'MyLeads',
                   });
                 }

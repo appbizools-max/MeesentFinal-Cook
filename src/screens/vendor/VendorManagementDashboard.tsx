@@ -96,7 +96,8 @@ export default function VendorManagementDashboard({ navigation, route }: any) {
                   import('../../services/notification.service').then(({ default: ns }) => {
                     ns.sendLocalNotification(
                       'Business Approved! 🎉',
-                      `Your business "${newData.businessName}" has been successfully approved by the admin. You now have full access.`
+                      `Your business "${newData.businessName}" has been successfully approved by the admin. You now have full access.`,
+                      { module: 'services', isService: true, screen: 'ServicesHome' }
                     );
                   });
                 }
@@ -252,9 +253,12 @@ export default function VendorManagementDashboard({ navigation, route }: any) {
             vendorData?.tookVerification === true ||
             vendorData?.isVerified === true ||
             vendorData?.verifyMark === true ||
-            vendorData?.verificationStatus === 'verified' ||
-            (vendorData?.planId && vendorData.planId !== 'free') ||
-            (vendorData?.plan && vendorData.plan !== 'none' && vendorData.plan !== 'free')
+            vendorData?.verificationStatus === 'verified'
+          );
+          const isApproved = vendorData?.status === 'approved' || vendorData?.status === 'active';
+          const hasActivePlan = Boolean(
+            vendorData?.planId && vendorData.planId !== 'none' &&
+            vendorData?.planExpiry && new Date(vendorData.planExpiry) > new Date()
           );
           return (
             <>
@@ -308,36 +312,56 @@ export default function VendorManagementDashboard({ navigation, route }: any) {
                 </View>
               </View>
 
-              {/* Dynamic Verification / Upgrade Banner */}
+              {/* Dynamic Verification / Upgrade / Plan Activation Banner */}
               <TouchableOpacity
                 style={styles.boostBanner}
                 onPress={() => {
-                  if (isVendorVerified) {
+                  if (!hasActivePlan && isApproved) {
                     navigation.navigate('SelectPlan', { vendorId: vendorData.id, isUpgrade: true });
-                  } else {
+                  } else if (!isVendorVerified) {
                     navigation.navigate('BusinessVerification', { vendorId: vendorData.id });
+                  } else {
+                    navigation.navigate('SelectPlan', { vendorId: vendorData.id, isUpgrade: true });
                   }
                 }}
               >
                 <LinearGradient
-                  colors={isVendorVerified ? ['#3b82f6', '#1d4ed8'] : ['#10b981', '#059669']}
+                  colors={
+                    !hasActivePlan && isApproved
+                      ? ['#6366f1', '#4f46e5']
+                      : !isVendorVerified
+                        ? ['#10b981', '#059669']
+                        : ['#3b82f6', '#1d4ed8']
+                  }
                   style={styles.boostGradient}
                 >
                   <View style={styles.boostContent}>
                     <Text style={styles.boostTitle}>
-                      {isVendorVerified ? 'Upgrade Your Plan' : 'Get Verified Badge!'}
+                      {!hasActivePlan && isApproved
+                        ? 'Activate Your Plan'
+                        : !isVendorVerified
+                          ? 'Get Verified Badge!'
+                          : 'Upgrade Your Plan'}
                     </Text>
                     <Text style={styles.boostSub}>
-                      {isVendorVerified ? 'Boost visibility and unlock premium features' : 'Build customer trust with a Genuine Verified symbol'}
+                      {!hasActivePlan && isApproved
+                        ? 'Your business is approved! Tap to activate your Free Plan or upgrade.'
+                        : !isVendorVerified
+                          ? 'Build customer trust with a Genuine Verified symbol'
+                          : 'Boost visibility and unlock premium features'}
                     </Text>
                     <View style={styles.boostBtn}>
-                      <Text style={[styles.boostBtnText, { color: isVendorVerified ? '#3b82f6' : '#10b981' }]}>
-                        {isVendorVerified ? 'VIEW PLANS' : `GET VERIFIED - ₹${verificationPrice}`}
+                      <Text style={[styles.boostBtnText, { color: !hasActivePlan && isApproved ? '#4f46e5' : !isVendorVerified ? '#10b981' : '#3b82f6' }]}>
+                        {!hasActivePlan && isApproved
+                          ? 'ACTIVATE PLAN'
+                          : !isVendorVerified
+                            ? `GET VERIFIED - ₹${verificationPrice}`
+                            : 'VIEW PLANS'}
                       </Text>
                     </View>
                   </View>
                   <Ionicons
-                    name={isVendorVerified ? "rocket" : "shield-checkmark"}
+                    name={!hasActivePlan && isApproved ? "rocket-outline" : !isVendorVerified ? "shield-checkmark" : "rocket"}
                     size={80}
                     color="rgba(255,255,255,0.2)"
                     style={styles.boostIcon}

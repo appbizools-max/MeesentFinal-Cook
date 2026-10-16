@@ -445,9 +445,9 @@ export default function SelectPlanScreen({ route, navigation }: any) {
     const pId = biz.planId || biz.plan;
     if (!pId || pId === 'none') return false;
     const rawExp = biz.planExpiry || biz.currentPeriodEnd || biz.planEndDate || biz.expiryDate;
-    if (!rawExp) return true;
+    if (!rawExp) return false;
     const parsed = getParsedExpiry(rawExp);
-    return parsed ? parsed.getTime() > Date.now() : true;
+    return parsed ? parsed.getTime() > Date.now() : false;
   };
 
   const activeBusiness = businesses.find(b => b.id === activeVendorId);
@@ -455,9 +455,7 @@ export default function SelectPlanScreen({ route, navigation }: any) {
     activeBusiness.tookVerification === true ||
     activeBusiness.isVerified === true ||
     activeBusiness.verifyMark === true ||
-    activeBusiness.verificationStatus === 'verified' ||
-    (activeBusiness.planId && activeBusiness.planId !== 'none') ||
-    (activeBusiness.plan && activeBusiness.plan !== 'none')
+    activeBusiness.verificationStatus === 'verified'
   ) : false;
   const hasActivePlan = checkPlanActive(activeBusiness);
 
@@ -503,10 +501,6 @@ export default function SelectPlanScreen({ route, navigation }: any) {
         planStartDate: new Date().toISOString(),
         planUpdatedAt: new Date().toISOString(),
         planBundle: `${selectedPlanId.toUpperCase()} (${selectedDuration?.months || 1}M)`,
-        isVerified: true,
-        tookVerification: true,
-        verifyMark: true,
-        verificationStatus: 'verified',
         updatedAt: serverTimestamp(),
       });
 
@@ -523,6 +517,19 @@ export default function SelectPlanScreen({ route, navigation }: any) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      // Update User document subscriptionPlan
+      const currentUid = auth.currentUser?.uid;
+      if (currentUid) {
+        try {
+          await updateDoc(doc(db, 'users', currentUid), {
+            'subscriptionPlan.planId': selectedPlanId,
+            'subscriptionPlan.status': 'active',
+            'subscriptionPlan.startDate': new Date().toISOString(),
+            'subscriptionPlan.expiryDate': expiryDate.toISOString(),
+          });
+        } catch (_) {}
+      }
 
       // 3. Write/Update transactions/{txnId}
       const txnRef = doc(collection(db, 'transactions'));
@@ -564,10 +571,6 @@ export default function SelectPlanScreen({ route, navigation }: any) {
         planId: selectedPlanId,
         plan: selectedPlanId,
         planExpiry: expiryDate.toISOString(),
-        isVerified: true,
-        tookVerification: true,
-        verifyMark: true,
-        verificationStatus: 'verified'
       } : b));
 
       // Refresh the taken plans list state
@@ -577,7 +580,8 @@ export default function SelectPlanScreen({ route, navigation }: any) {
       try {
         await notificationService.sendLocalNotification(
           'Plan Upgraded successfully! 🎉',
-          `Your business "${activeBusiness?.businessName || 'Business'}" is now upgraded to ${selectedPlan?.name}.`
+          `Your business "${activeBusiness?.businessName || 'Business'}" is now upgraded to ${selectedPlan?.name}.`,
+          { module: 'services', isService: true, screen: 'ServicesHome' }
         );
       } catch (pushError) {
         console.error('Error sending local notification:', pushError);
@@ -739,9 +743,7 @@ export default function SelectPlanScreen({ route, navigation }: any) {
                         biz.tookVerification === true ||
                         biz.isVerified === true ||
                         biz.verifyMark === true ||
-                        biz.verificationStatus === 'verified' ||
-                        (biz.planId && biz.planId !== 'free') ||
-                        (biz.plan && biz.plan !== 'none' && biz.plan !== 'free')
+                        biz.verificationStatus === 'verified'
                       );
                       const isPlanActive = checkPlanActive(biz);
                       const activePlanName = (biz.planId && biz.planId !== 'free') ? biz.planId : (biz.plan && biz.plan !== 'none' && biz.plan !== 'free') ? biz.plan : null;
@@ -785,7 +787,7 @@ export default function SelectPlanScreen({ route, navigation }: any) {
                             {isPlanActive
                               ? `Exp: ${formattedExpiry || 'Active'}`
                               : isVerified
-                                ? (activePlanName ? `Plan: ${activePlanName.toUpperCase()}` : 'Verified (Free Plan)')
+                                ? (activePlanName ? `Plan: ${activePlanName.toUpperCase()}` : 'No Plan Active (Select Below)')
                                 : 'Verification Required'}
                           </Text>
                         </TouchableOpacity>

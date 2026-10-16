@@ -123,6 +123,55 @@ export default function MyPostedJobsScreen({ navigation }: any) {
     }
   };
 
+  const handleDeleteJob = (job: any) => {
+    Alert.alert(
+      'Delete Job Opening?',
+      `Are you sure you want to delete "${job.title}"? This cannot be undone and will permanently remove this job post.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Delete the job document from Firestore
+              await deleteDoc(doc(db, 'jobs', job.id));
+
+              // Update local state immediately
+              setPostedJobs((prev) => prev.filter((item) => item.id !== job.id));
+
+              Toast.show({
+                type: 'success',
+                text1: 'Job Deleted',
+                text2: `"${job.title}" has been removed.`,
+              });
+
+              // Clean up any associated job applications
+              try {
+                const qApps = query(
+                  collection(db, 'job_applications'),
+                  where('jobId', '==', job.id)
+                );
+                const appsSnap = await getDocs(qApps);
+                const deletePromises = appsSnap.docs.map((d) => deleteDoc(d.ref));
+                await Promise.all(deletePromises);
+              } catch (cleanErr) {
+                console.warn('Error cleaning up applications for deleted job:', cleanErr);
+              }
+            } catch (error: any) {
+              console.error('Error deleting job:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.message || 'Failed to delete job',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleFetchApplicants = async (job: any) => {
     setSelectedJobForApplicants(job);
     setApplicantsLoading(true);
@@ -363,11 +412,20 @@ export default function MyPostedJobsScreen({ navigation }: any) {
           onPress={() => handleFetchApplicants(item)}
           activeOpacity={0.7}
         >
-          <Ionicons name="people-outline" size={18} color="#3b82f6" style={{ marginRight: 6 }} />
+          <Ionicons name="people-outline" size={16} color="#2563EB" style={{ marginRight: 6 }} />
           <Text style={styles.applicantsBtnText}>
-            View Applicants ({item.applicationsCount || 0})
+            Applicants ({item.applicationsCount || 0})
           </Text>
-          <Ionicons name="chevron-forward" size={14} color="#3b82f6" style={{ marginLeft: 4 }} />
+          <Ionicons name="chevron-forward" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.deleteJobBtn}
+          onPress={() => handleDeleteJob(item)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={16} color="#ef4444" />
+          <Text style={styles.deleteJobBtnText}>Delete</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -753,19 +811,33 @@ const styles = StyleSheet.create({
   detailItem: { width: '47%', flexDirection: 'row', alignItems: 'center', gap: 6 },
   detailText: { fontSize: 11, color: '#64748b', fontWeight: '600' },
   cardDivider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 12 },
-  cardFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   applicantsTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    flex: 1,
+  },
+  applicantsBtnText: { fontSize: 13, fontWeight: 'bold', color: '#2563EB' },
+  deleteJobBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fef2f2',
     borderWidth: 1,
-    borderColor: '#fee2e2',
+    borderColor: '#fecaca',
     paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 12,
-    flex: 1,
+    gap: 4,
   },
-  applicantsBtnText: { fontSize: 13, fontWeight: 'bold', color: '#3b82f6' },
+  deleteJobBtnText: { fontSize: 13, fontWeight: 'bold', color: '#ef4444' },
 
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 120, paddingHorizontal: 30 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#475569', marginTop: 15 },

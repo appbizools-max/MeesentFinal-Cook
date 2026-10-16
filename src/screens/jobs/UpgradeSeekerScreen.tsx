@@ -221,7 +221,7 @@ export default function UpgradeSeekerScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}>
           
           {/* Hero Section */}
           <View style={styles.heroSection}>
@@ -347,7 +347,7 @@ export default function UpgradeSeekerScreen({ navigation }: any) {
         </ScrollView>
 
         {/* Floating Action Button */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           {(() => {
             const isAnyPremiumActive = seekerPlanActive && seekerPlanExpiry && (new Date(seekerPlanExpiry.toDate ? seekerPlanExpiry.toDate() : seekerPlanExpiry) > new Date());
             return (

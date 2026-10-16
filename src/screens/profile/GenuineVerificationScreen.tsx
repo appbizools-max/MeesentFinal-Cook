@@ -212,7 +212,8 @@ export default function GenuineVerificationScreen({ navigation }: any) {
       try {
         await notificationService.sendLocalNotification(
           'Genuine Verification Active 🛡️',
-          'Congratulations! Your profile is now Genuine Verified for 30 days.'
+          'Congratulations! Your profile is now Genuine Verified for 30 days.',
+          { module: 'services', isService: true, screen: 'ServicesHome' }
         );
       } catch (pushError) {
         console.error('Error sending local notification:', pushError);
@@ -294,7 +295,7 @@ export default function GenuineVerificationScreen({ navigation }: any) {
             </View>
           </ScrollView>
 
-          <View style={styles.verifiedFooter}>
+          <View style={[styles.verifiedFooter, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
             <TouchableOpacity 
               style={styles.backToProfileBtn} 
               onPress={() => navigation.goBack()}
@@ -322,7 +323,7 @@ export default function GenuineVerificationScreen({ navigation }: any) {
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}>
           
           {/* Hero Section */}
           <View style={styles.heroSection}>
@@ -410,7 +411,7 @@ export default function GenuineVerificationScreen({ navigation }: any) {
         </ScrollView>
 
         {/* Footer */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <TouchableOpacity 
             style={styles.purchaseBtn} 
             activeOpacity={0.8} 

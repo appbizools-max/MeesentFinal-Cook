@@ -148,18 +148,15 @@ export const Vendors = () => {
       const vendorDoc = vendors.find(v => v.id === vendorId);
       const ownerId = vendorDoc?.userId || vendorDoc?.ownerId;
 
+      const isApproved = status === 'verified' || status === 'approved';
       await updateDoc(doc(db, 'vendors', vendorId), {
-        verificationStatus: status,
-        isVerified: status === 'verified',
-        tookVerification: status === 'verified',
-        verifyMark: status === 'verified',
-        status: status === 'verified' ? 'approved' : 'rejected',
-        publiclyVisible: status === 'verified' // Make visible only when approved
+        status: isApproved ? 'approved' : 'rejected',
+        publiclyVisible: isApproved // Make visible only when approved
       });
 
       if (ownerId) {
         await updateDoc(doc(db, 'users', ownerId), {
-          vendorStatus: status === 'verified' ? 'approved' : 'rejected'
+          vendorStatus: isApproved ? 'approved' : 'rejected'
         });
       }
 

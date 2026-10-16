@@ -530,7 +530,14 @@ export default function ServicesProfileScreen({ navigation }: any) {
               style={styles.statCard}
               onPress={() => {
                 console.log('Upgrade Plan clicked, hasVerificationBadge:', profile.hasVerificationBadge);
-                if (profile.hasVerificationBadge === true) {
+                const canAccessPlans = Boolean(
+                  profile.hasVerificationBadge ||
+                  profile.verified ||
+                  profile.vendorStatus === 'approved' ||
+                  profile.isVendor ||
+                  hasBusiness
+                );
+                if (canAccessPlans) {
                   if (hasBusiness) {
                     navigation.navigate('SelectPlan', {
                       vendorId: userBusinesses[0]?.id,
@@ -660,7 +667,14 @@ export default function ServicesProfileScreen({ navigation }: any) {
               style={styles.menuItem}
               onPress={() => {
                 console.log('Boost Your Business clicked, hasVerificationBadge:', profile.hasVerificationBadge);
-                if (profile.hasVerificationBadge === true) {
+                const canAccessPlans = Boolean(
+                  profile.hasVerificationBadge ||
+                  profile.verified ||
+                  profile.vendorStatus === 'approved' ||
+                  profile.isVendor ||
+                  hasBusiness
+                );
+                if (canAccessPlans) {
                   if (hasBusiness) {
                     navigation.navigate('SelectPlan', {
                       vendorId: userBusinesses[0]?.id,

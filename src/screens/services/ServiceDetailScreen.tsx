@@ -51,6 +51,17 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
     t('service_detail.gallery')
   ];
 
+  const allGalleryImages = React.useMemo(() => {
+    const catalogImages = (displayService?.catalog || [])
+      .map((item: any) => item?.imageUrl || item?.image)
+      .filter(Boolean);
+    const raw = [
+      ...(displayService?.images || []),
+      ...catalogImages,
+    ];
+    return Array.from(new Set(raw.filter(Boolean)));
+  }, [displayService?.images, displayService?.catalog]);
+
   const [activeTab, setActiveTab] = useState(t('service_detail.overview'));
 
   useEffect(() => {
@@ -208,7 +219,7 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
 
           <View style={styles.titleOverlay}>
             <View style={styles.badgeRow}>
-              {(service.tookVerification || service.isVerified || service.verifyMark || service.verificationStatus === 'verified' || service.status === 'verified') && (
+              {(service.tookVerification || service.isVerified || service.verifyMark || service.verificationStatus === 'verified') && (
                 <View style={styles.genuinePill}>
                   <Ionicons name="shield-checkmark" size={10} color="white" />
                   <Text style={styles.genuinePillText}>Genuine Verified</Text>
@@ -403,17 +414,37 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
                   {displayService.type === 'product' ? 'No featured products listed yet.' : 'No featured services listed yet.'}
                 </Text>
               ) : (
-                displayService.catalog.map((item: any, i: number) => (
-                  <View key={i} style={styles.serviceCard}>
-                    <View style={styles.serviceInfo}>
-                      <Text style={styles.serviceName}>{item.name}</Text>
-                      <Text style={styles.serviceDesc}>{item.description || t('service_detail.includes_support')}</Text>
+                displayService.catalog.map((item: any, i: number) => {
+                  const flyerImg = item.imageUrl || item.image;
+                  return (
+                    <View key={i} style={styles.serviceCard}>
+                      {flyerImg ? (
+                        <TouchableOpacity 
+                          onPress={() => {
+                            const foundIdx = allGalleryImages.indexOf(flyerImg);
+                            setPreviewImage(flyerImg);
+                            setPreviewIndex(foundIdx >= 0 ? foundIdx : 0);
+                          }}
+                          activeOpacity={0.8}
+                          style={{ marginRight: 12 }}
+                        >
+                          <Image 
+                            source={{ uri: flyerImg }} 
+                            style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: '#f1f5f9' }} 
+                            resizeMode="cover"
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                      <View style={styles.serviceInfo}>
+                        <Text style={styles.serviceName}>{item.name}</Text>
+                        <Text style={styles.serviceDesc}>{item.description || t('service_detail.includes_support')}</Text>
+                      </View>
+                      <Text style={[styles.servicePrice, (item.price === null || item.price === undefined || item.price === '') && { fontSize: 11, color: '#94a3b8' }]}>
+                        {item.price !== null && item.price !== undefined && item.price !== '' ? `₹${item.price}` : 'Price on Request'}
+                      </Text>
                     </View>
-                    <Text style={[styles.servicePrice, (item.price === null || item.price === undefined || item.price === '') && { fontSize: 11, color: '#94a3b8' }]}>
-                      {item.price !== null && item.price !== undefined && item.price !== '' ? `₹${item.price}` : 'Price on Request'}
-                    </Text>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           )}
@@ -425,8 +456,8 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
               <View style={styles.cardSection}>
                 <Text style={styles.cardTitle}>Photos & Work Showcase</Text>
                 <View style={styles.galleryGrid}>
-                  {displayService.images && displayService.images.length > 0 ? (
-                    displayService.images.map((imgUri: string, idx: number) => (
+                  {allGalleryImages.length > 0 ? (
+                    allGalleryImages.map((imgUri: string, idx: number) => (
                       <TouchableOpacity
                         key={idx}
                         onPress={() => { setPreviewImage(imgUri); setPreviewIndex(idx); }}
@@ -540,7 +571,7 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
           {/* Image Counter */}
           <View style={styles.imageCounter}>
             <Text style={styles.imageCounterText}>
-              {previewIndex + 1} / {displayService.images?.length || 4}
+              {previewIndex + 1} / {allGalleryImages.length || 1}
             </Text>
           </View>
 
@@ -551,20 +582,20 @@ export default function ServiceDetailScreen({ route, navigation }: any) {
               onPress={() => {
                 const newIndex = previewIndex - 1;
                 setPreviewIndex(newIndex);
-                setPreviewImage(displayService.images?.[newIndex] || `https://picsum.photos/seed/${displayService.id}${newIndex + 1}/400/300`);
+                setPreviewImage(allGalleryImages[newIndex] || `https://picsum.photos/seed/${displayService.id}${newIndex + 1}/400/300`);
               }}
             >
               <Ionicons name="chevron-back" size={32} color="white" />
             </TouchableOpacity>
           )}
 
-          {previewIndex < (displayService.images?.length || 4) - 1 && (
+          {previewIndex < (allGalleryImages.length || 1) - 1 && (
             <TouchableOpacity
               style={styles.navButtonRight}
               onPress={() => {
                 const newIndex = previewIndex + 1;
                 setPreviewIndex(newIndex);
-                setPreviewImage(displayService.images?.[newIndex] || `https://picsum.photos/seed/${displayService.id}${newIndex + 1}/400/300`);
+                setPreviewImage(allGalleryImages[newIndex] || `https://picsum.photos/seed/${displayService.id}${newIndex + 1}/400/300`);
               }}
             >
               <Ionicons name="chevron-forward" size={32} color="white" />

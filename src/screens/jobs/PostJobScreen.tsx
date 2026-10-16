@@ -16,6 +16,8 @@ import {
   Alert,
   Switch,
   Image,
+  Keyboard,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -133,19 +135,23 @@ const SALARY_TYPES = ['Per Month', 'Per Year', 'Per Hour', 'Project Basis'];
 const InputField = ({ label, icon, placeholder, value, onChangeText, required = true, isDropdown = false, rightContent = null, onDropdownPress = undefined, ...rest }: any) => (
   <View style={styles.inputWrapper}>
     <Text style={styles.inputLabel}>{label} {required && <Text style={{ color: '#2563EB' }}>*</Text>}</Text>
-    <TouchableOpacity
-      activeOpacity={isDropdown ? 0.7 : 1}
-      onPress={isDropdown ? onDropdownPress : undefined}
-      style={styles.inputContainer}
-    >
-      <Ionicons name={icon} size={18} color="#64748B" style={{ marginLeft: 14, marginRight: 8 }} />
-      {isDropdown ? (
+    {isDropdown ? (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={onDropdownPress}
+        style={styles.inputContainer}
+      >
+        <Ionicons name={icon} size={18} color="#64748B" style={{ marginLeft: 14, marginRight: 8 }} />
         <View style={{ flex: 1, justifyContent: 'center' }}>
           <Text style={[styles.dropdownField, !value && { color: '#94a3b8' }]}>
             {value || placeholder}
           </Text>
         </View>
-      ) : (
+        <Ionicons name="chevron-down" size={18} color="#64748B" style={{ marginRight: 14 }} />
+      </TouchableOpacity>
+    ) : (
+      <View style={styles.inputContainer}>
+        <Ionicons name={icon} size={18} color="#64748B" style={{ marginLeft: 14, marginRight: 8 }} />
         <TextInput
           style={styles.inputField}
           placeholder={placeholder}
@@ -154,13 +160,11 @@ const InputField = ({ label, icon, placeholder, value, onChangeText, required = 
           onChangeText={onChangeText}
           {...rest}
         />
-      )}
-      {isDropdown ? (
-        <Ionicons name="chevron-down" size={18} color="#64748B" style={{ marginRight: 14 }} />
-      ) : rightContent ? (
-        <View style={{ marginRight: 14 }}>{rightContent}</View>
-      ) : null}
-    </TouchableOpacity>
+        {rightContent ? (
+          <View style={{ marginRight: 14 }}>{rightContent}</View>
+        ) : null}
+      </View>
+    )}
   </View>
 );
 export default function PostJobScreen({ navigation }: any) {
@@ -385,6 +389,35 @@ export default function PostJobScreen({ navigation }: any) {
   const [searchDistrictQuery, setSearchDistrictQuery] = useState('');
   const [selectedState, setSelectedState] = useState<'Andhra Pradesh' | 'Telangana' | null>(null);
 
+  // Job Expiry Date States (Maximum 2 Months / 60 Days from today)
+  const maxAllowedExpiryDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 60);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, []);
+
+  const minAllowedExpiryDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const [selectedExpiryDate, setSelectedExpiryDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30); // Default to 30 days
+    return d;
+  });
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [tempCalendarDate, setTempCalendarDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d;
+  });
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+
+
   // Dynamic pricing listener for Top Visibility from Admin (service_pricing config)
   React.useEffect(() => {
     const unsubPricing = onSnapshot(doc(db, 'config', 'service_pricing'), (snapshot) => {
@@ -496,11 +529,22 @@ export default function PostJobScreen({ navigation }: any) {
       return;
     }
 
+    const now = new Date();
+    if (selectedExpiryDate <= now) {
+      Alert.alert('Invalid Expiry Date', 'Please select a future date for the job expiry.');
+      return;
+    }
+
+    if (selectedExpiryDate > maxAllowedExpiryDate) {
+      Alert.alert('Expiry Limit Exceeded', 'Job expiry date cannot exceed 2 months (60 days) from today.');
+      return;
+    }
+
     const hasPaidFeatures = isTopVisibility;
 
     if (hasPaidFeatures) {
       let message = 'Upgrade to get premium features:\n';
-      if (isTopVisibility) message += '• Top Visibility: ₹99/month\n';
+      if (isTopVisibility) message += `• Top Visibility: ₹${topVisibilityPrice}/month\n`;
       message += '\nProceed with payment?';
 
       Alert.alert(
@@ -530,7 +574,7 @@ export default function PostJobScreen({ navigation }: any) {
       image: 'https://img.icons8.com/fluency/96/rocket.png',
       currency: 'INR',
       key: RAZORPAY_CONFIG.keyId,
-      amount: '9900', // ₹99 in paise
+      amount: String(topVisibilityPrice * 100), // Dynamic amount from admin (in paise)
       name: 'Meesent Technology',
       prefill: {
         email: auth.currentUser?.email || 'user@example.com',
@@ -654,8 +698,14 @@ export default function PostJobScreen({ navigation }: any) {
 
       const hash = geohashForLocation([finalLat, finalLng]);
 
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 30);
+      // Calculate expiry date from user selection (normalized to end of that day 23:59:59)
+      const expiryDate = new Date(selectedExpiryDate);
+      expiryDate.setHours(23, 59, 59, 999);
+      // Hard cap: maximum 60 days (2 months) from today
+      const maxCap = new Date();
+      maxCap.setDate(maxCap.getDate() + 60);
+      maxCap.setHours(23, 59, 59, 999);
+      const finalExpiryDate = expiryDate > maxCap ? maxCap : expiryDate;
 
       const formattedSalary = maxSalaryNum > 0
         ? `₹${minSalaryNum.toLocaleString()} - ₹${maxSalaryNum.toLocaleString()}`
@@ -696,7 +746,7 @@ export default function PostJobScreen({ navigation }: any) {
         isGenuineVerified: isUserGenuine,
         genuineVerificationEndDate: genuineEndDate,
         createdAt: serverTimestamp(),
-        expiryDate: expiryDate,
+        expiryDate: finalExpiryDate,
         applicationsCount: 0,
         paymentId: paymentId || '',
         vacancies: Number(vacancies) || 1,
@@ -733,7 +783,7 @@ export default function PostJobScreen({ navigation }: any) {
         await addDoc(collection(db, 'payments'), {
           userId,
           jobId: jobDocRef.id,
-          amount: 99,
+          amount: topVisibilityPrice,
           paymentId: paymentId,
           status: 'success',
           description: `Job Posting Top Visibility Upgrade (${title})`,
@@ -762,22 +812,25 @@ export default function PostJobScreen({ navigation }: any) {
       <StatusBar style="dark" />
 
       {/* App Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="#1e293b" />
-        </TouchableOpacity>
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>Post a Job</Text>
-          <Text style={styles.headerSubtitle}>Reach the right talent. <Text style={{ color: '#0035a0' }}>It's free to post!</Text></Text>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={22} color="#1e293b" />
+          </TouchableOpacity>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>Post a Job</Text>
+            <Text style={styles.headerSubtitle}>Reach the right talent. <Text style={{ color: '#0035a0' }}>It's free to post!</Text></Text>
+          </View>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 150 + insets.bottom }}
-          keyboardShouldPersistTaps="always"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {/* Live Preview Toggle Header Button */}
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 15, marginTop: 12, marginBottom: 4 }}>
@@ -823,6 +876,11 @@ export default function PostJobScreen({ navigation }: any) {
                       </Text>
                     </View>
                   ) : null}
+                  <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#fecaca' }}>
+                    <Text style={{ fontSize: 10, color: '#dc2626', fontWeight: '700' }}>
+                      📅 Expires: {selectedExpiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </Text>
+                  </View>
                 </View>
                 
                 <View style={{ height: 1, backgroundColor: '#f1f5f9', marginVertical: 10 }} />
@@ -1059,6 +1117,30 @@ export default function PostJobScreen({ navigation }: any) {
                   )}
                 </View>
 
+                {/* Job Expiry Date Input (Max 2 Months) */}
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.inputLabel}>
+                    Job Expiry Date <Text style={{ color: '#2563EB' }}>* (Max 2 Months)</Text>
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setTempCalendarDate(new Date(selectedExpiryDate));
+                      setCalendarMonth(new Date(selectedExpiryDate));
+                      setShowDatePickerModal(true);
+                    }}
+                    style={styles.inputContainer}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#64748B" style={{ marginLeft: 14, marginRight: 8 }} />
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                      <Text style={styles.dropdownField}>
+                        {selectedExpiryDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                      </Text>
+                    </View>
+                    <Ionicons name="calendar" size={18} color="#2563EB" style={{ marginRight: 14 }} />
+                  </TouchableOpacity>
+                </View>
+
                 {/* Contact numbers row */}
                 <View style={styles.row}>
                   <View style={styles.halfWidth}>
@@ -1198,7 +1280,7 @@ export default function PostJobScreen({ navigation }: any) {
             <View style={styles.upgradeContent}>
               <Text style={styles.upgradeTitle}>Top Visibility Upgrade</Text>
               <View style={styles.upgradeTags}>
-                <View style={styles.priceTag}><Text style={styles.priceTagText}>₹99</Text></View>
+                <View style={styles.priceTag}><Text style={styles.priceTagText}>₹{topVisibilityPrice}</Text></View>
                 <Text style={styles.daysText}>30 Days</Text>
                 <Text style={styles.daysText}>Unlimited Job Posting</Text>
               </View>
@@ -1218,33 +1300,35 @@ export default function PostJobScreen({ navigation }: any) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Sticky Footer */}
-      <View style={styles.stickyFooter}>
-        <View style={styles.footerInner}>
-          <TouchableOpacity
-            style={[styles.postBtn, loading && { opacity: 0.7 }]}
-            onPress={handlePostJob}
-            disabled={loading}
-          >
-            {loading ? <ActivityIndicator color="white" /> : (
-              <>
-                <Text style={styles.postBtnText}>
-                  {isTopVisibility ? 'Pay & Post Job' : 'Post Job for Free'}
-                </Text>
-                <View style={styles.postBtnArrow}>
-                  <Ionicons name="arrow-forward" size={16} color="#2563EB" />
-                </View>
-              </>
-            )}
-          </TouchableOpacity>
+      {/* Sticky Footer - lifted cleanly above the system navigation safe area */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+          <View style={styles.footerInner}>
+            <TouchableOpacity
+              style={[styles.postBtn, loading && { opacity: 0.7 }]}
+              onPress={handlePostJob}
+              disabled={loading}
+            >
+              {loading ? <ActivityIndicator color="white" /> : (
+                <>
+                  <Text style={styles.postBtnText}>
+                    {isTopVisibility ? 'Pay & Post Job' : 'Post Job for Free'}
+                  </Text>
+                  <View style={styles.postBtnArrow}>
+                    <Ionicons name="arrow-forward" size={16} color="#2563EB" />
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={styles.footerBottomLinks}>
+            <Ionicons name="lock-closed" size={12} color="#64748b" />
+            <Text style={styles.footerLinkText}>Secure. Fast. Easy</Text>
+            <Text style={styles.footerLinkDot}>•</Text>
+            <Text style={styles.footerLinkText}>Verified Employer Network</Text>
+          </View>
         </View>
-        <View style={styles.footerBottomLinks}>
-          <Ionicons name="lock-closed" size={12} color="#64748b" />
-          <Text style={styles.footerLinkText}>Secure. Fast. Easy</Text>
-          <Text style={styles.footerLinkDot}>•</Text>
-          <Text style={styles.footerLinkText}>Verified Employer Network</Text>
-        </View>
-      </View>
+      </TouchableWithoutFeedback>
 
 
 
@@ -1433,6 +1517,214 @@ export default function PostJobScreen({ navigation }: any) {
                 />
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Expiry Date Picker Modal (Max 2 Months) */}
+      <Modal visible={showDatePickerModal} animationType="fade" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowDatePickerModal(false)}
+          />
+          <View style={[styles.modalContent, { maxWidth: 360, padding: 18 }]}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={[styles.modalIconBadge, { backgroundColor: '#eff6ff' }]}>
+                  <Ionicons name="calendar" size={18} color="#2563EB" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>Select Expiry Date</Text>
+                  <Text style={styles.modalSubtitle}>Max 2 months (60 days) from today</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowDatePickerModal(false)}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalHeaderDivider} />
+
+            {/* Month Navigation */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 10 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  const newM = new Date(calendarMonth);
+                  newM.setMonth(newM.getMonth() - 1);
+                  const currentM = new Date();
+                  currentM.setDate(1);
+                  currentM.setHours(0, 0, 0, 0);
+                  if (newM >= currentM) {
+                    setCalendarMonth(newM);
+                  }
+                }}
+                disabled={calendarMonth.getMonth() === new Date().getMonth() && calendarMonth.getFullYear() === new Date().getFullYear()}
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  opacity: (calendarMonth.getMonth() === new Date().getMonth() && calendarMonth.getFullYear() === new Date().getFullYear()) ? 0.3 : 1
+                }}
+              >
+                <Ionicons name="chevron-back" size={20} color="#1e293b" />
+              </TouchableOpacity>
+
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>
+                {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const newM = new Date(calendarMonth);
+                  newM.setMonth(newM.getMonth() + 1);
+                  const maxM = new Date();
+                  maxM.setMonth(maxM.getMonth() + 2);
+                  maxM.setDate(28);
+                  if (newM <= maxM) {
+                    setCalendarMonth(newM);
+                  }
+                }}
+                disabled={
+                  (calendarMonth.getFullYear() * 12 + calendarMonth.getMonth()) >=
+                  (new Date().getFullYear() * 12 + new Date().getMonth() + 2)
+                }
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  opacity: ((calendarMonth.getFullYear() * 12 + calendarMonth.getMonth()) >= (new Date().getFullYear() * 12 + new Date().getMonth() + 2)) ? 0.3 : 1
+                }}
+              >
+                <Ionicons name="chevron-forward" size={20} color="#1e293b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Days of week header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8 }}>
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d, i) => (
+                <Text key={i} style={{ width: 38, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#94a3b8' }}>
+                  {d}
+                </Text>
+              ))}
+            </View>
+
+            {/* Calendar Grid */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {(() => {
+                const year = calendarMonth.getFullYear();
+                const month = calendarMonth.getMonth();
+                const firstDayIndex = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const cells = [];
+
+                // Blank cells for preceding days
+                for (let i = 0; i < firstDayIndex; i++) {
+                  cells.push(<View key={`blank-${i}`} style={{ width: '14.28%', height: 36 }} />);
+                }
+
+                // Days cells
+                for (let day = 1; day <= daysInMonth; day++) {
+                  const thisDate = new Date(year, month, day);
+                  thisDate.setHours(12, 0, 0, 0);
+
+                  const isPast = thisDate < minAllowedExpiryDate;
+                  const isBeyondMax = thisDate > maxAllowedExpiryDate;
+                  const isDisabled = isPast || isBeyondMax;
+                  const isSelected =
+                    tempCalendarDate.getFullYear() === year &&
+                    tempCalendarDate.getMonth() === month &&
+                    tempCalendarDate.getDate() === day;
+
+                  cells.push(
+                    <TouchableOpacity
+                      key={`day-${day}`}
+                      disabled={isDisabled}
+                      onPress={() => {
+                        const newD = new Date(year, month, day);
+                        setTempCalendarDate(newD);
+                      }}
+                      style={{
+                        width: '14.28%',
+                        height: 36,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 15,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          backgroundColor: isSelected ? '#2563EB' : 'transparent',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: isSelected ? '800' : '600',
+                            color: isSelected
+                              ? '#ffffff'
+                              : isDisabled
+                              ? '#cbd5e1'
+                              : '#1e293b',
+                          }}
+                        >
+                          {day}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }
+                return cells;
+              })()}
+            </View>
+
+            {/* Selected Date Summary & Confirm Action */}
+            <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>Expires on:</Text>
+                <Text style={{ fontSize: 12, color: '#0f172a', fontWeight: '800' }}>
+                  {tempCalendarDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setShowDatePickerModal(false)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: '#f1f5f9',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedExpiryDate(tempCalendarDate);
+                    setShowDatePickerModal(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: '#2563EB',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#ffffff' }}>Confirm Date</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>

@@ -618,9 +618,37 @@ export default function ServicesScreen({ route, navigation }: any) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ ...styles.contentPadding, paddingBottom: 20 + insets.bottom }}
         >
+          {ALL_CATEGORIES
+            .filter(c => activeTabId === 'all' || c.id === activeTabId)
+            .filter(category => {
+              if (!searchQuery) return true;
+              const query = searchQuery.toLowerCase();
+              const categoryName = category.name.toLowerCase();
+              const hasMatchingSub = category.subCategories.some(sub =>
+                sub.toLowerCase().includes(query)
+              );
+              return categoryName.includes(query) || hasMatchingSub;
+            })
+            .map((category) => (
+              <View key={category.id} style={styles.section}>
+                <View style={styles.gridContainer}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Image source={{ uri: category.icon8 }} style={styles.sectionIcon} />
+                    <Text style={styles.sectionHeader}>{t(`categories.${category.id}`)}</Text>
+                    <View style={styles.countBadge}>
+                      <Text style={styles.countText}>{category.subCategories.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.pillGrid}>
+                    {category.subCategories.map((sub) => renderSubCategory(sub, category))}
+                  </View>
+                </View>
+              </View>
+            ))}
+
           {/* Elite Directory Banner / Vendor Banner Slider */}
           {vendorBanners.length > 0 ? (
-            <View style={{ borderRadius: 24, overflow: 'hidden', height: 180, marginBottom: 30, position: 'relative', backgroundColor: '#f1f5f9' }}>
+            <View style={{ borderRadius: 24, overflow: 'hidden', height: 180, marginTop: 10, marginBottom: 30, position: 'relative', backgroundColor: '#f1f5f9' }}>
               <ScrollView
                 horizontal
                 pagingEnabled
@@ -667,7 +695,7 @@ export default function ServicesScreen({ route, navigation }: any) {
               colors={[PRIMARY_COLOR, '#8eabeb']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.eliteBanner}
+              style={[styles.eliteBanner, { marginTop: 10 }]}
             >
               <View style={styles.bannerContent}>
                 <View style={styles.badgeWrap}>
@@ -680,36 +708,6 @@ export default function ServicesScreen({ route, navigation }: any) {
               <Ionicons name="business" size={80} color="rgba(255,255,255,0.1)" style={styles.bannerBgIcon} />
             </LinearGradient>
           )}
-
-
-
-          {ALL_CATEGORIES
-            .filter(c => activeTabId === 'all' || c.id === activeTabId)
-            .filter(category => {
-              if (!searchQuery) return true;
-              const query = searchQuery.toLowerCase();
-              const categoryName = category.name.toLowerCase();
-              const hasMatchingSub = category.subCategories.some(sub =>
-                sub.toLowerCase().includes(query)
-              );
-              return categoryName.includes(query) || hasMatchingSub;
-            })
-            .map((category) => (
-              <View key={category.id} style={styles.section}>
-                <View style={styles.gridContainer}>
-                  <View style={styles.sectionHeaderRow}>
-                    <Image source={{ uri: category.icon8 }} style={styles.sectionIcon} />
-                    <Text style={styles.sectionHeader}>{t(`categories.${category.id}`)}</Text>
-                    <View style={styles.countBadge}>
-                      <Text style={styles.countText}>{category.subCategories.length}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.pillGrid}>
-                    {category.subCategories.map((sub) => renderSubCategory(sub, category))}
-                  </View>
-                </View>
-              </View>
-            ))}
           <View style={{ height: 100 }} />
         </ScrollView>
       )}

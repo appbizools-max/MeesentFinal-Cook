@@ -26,6 +26,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import JobsSidebar from '../../components/JobsSidebar';
 import PremiumLockModal from '../../components/PremiumLockModal';
 import { useJobCategories } from '../../hooks/useDynamicCategories';
+import AdMobJobCard from '../../components/ads/AdMobJobCard';
 
 const isJobGenuine = (item: any) => {
   if (!item) return false;
@@ -512,17 +513,23 @@ export default function JobsListScreen({ route, navigation }: any) {
     return { label: t('jobs_list.active'), color: '#10B981' };
   };
 
-  const renderJobItem = ({ item }: any) => {
+  const renderJobItem = ({ item, index }: any) => {
     const badge = getStatusBadge(item.status);
+    // Ad frequency: after every 2 jobs in Govt (Central & State), after every 3 jobs in Private
+    const showAdAfter = isGovernmentCategory
+      ? (index + 1) % 2 === 0
+      : (index + 1) % 3 === 0;
 
     // Special layout for government jobs - social-media style feed with high-fidelity badges and apply links
     if (isGovernmentCategory) {
       const applyUrl = item.applyUrl || item.applyLink || item.url || '';
+      const sourceLink = item.sourceLink || item.sourceUrl || item.applyUrl || item.applyLink || item.url || '';
       const rawPhoneNumber = item.whatsappNumber || item.contactNumber || '';
       const subCategoryTag = item.subCategory || item.jobSubCategory || item.jobType || 'Job';
 
       return (
-        <View style={styles.socialMediaFeedCard}>
+        <View key={item.id || index}>
+          <View style={styles.socialMediaFeedCard}>
           {/* Header Badges Bar */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
@@ -537,7 +544,7 @@ export default function JobsListScreen({ route, navigation }: any) {
             </View>
           </View>
 
-          {/* Large Hero Image - Landscape Banner */}
+          {/* 1. Large Hero Image */}
           {item.imageUrl ? (
             <Image
               source={{ uri: item.imageUrl }}
@@ -558,10 +565,7 @@ export default function JobsListScreen({ route, navigation }: any) {
             </View>
           )}
 
-          {/* Job Title - Bold Typography */}
-          <Text style={styles.socialMediaJobTitle}>{item.title}</Text>
-
-          {/* Action Buttons Row */}
+          {/* 2. Action Buttons Row (Directly below image) */}
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity
               style={[styles.whatsappActionButton, { backgroundColor: '#2563eb', borderColor: '#1d4ed8' }]}
@@ -609,21 +613,56 @@ export default function JobsListScreen({ route, navigation }: any) {
               <Text style={[styles.whatsappButtonText, { color: '#334155' }]}>Share</Text>
             </TouchableOpacity>
           </View>
+
+          {/* 3. Job Title */}
+          <Text style={styles.socialMediaJobTitle}>{item.title}</Text>
+
+          {/* 4. Job Description */}
+          {item.description ? (
+            <Text style={styles.socialMediaJobDescription}>
+              {item.description}
+            </Text>
+          ) : null}
+
+          {/* 5. Source Link in Plain Text Font Format (Redirects to URL on click) */}
+          {sourceLink ? (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.sourceTextContainer}
+              onPress={() => {
+                let urlToOpen = sourceLink.trim();
+                if (!urlToOpen.startsWith('http://') && !urlToOpen.startsWith('https://')) {
+                  urlToOpen = `https://${urlToOpen}`;
+                }
+                Linking.openURL(urlToOpen).catch(() => {
+                  Alert.alert('Link Error', 'Unable to open source link in browser.');
+                });
+              }}
+            >
+              <Text style={styles.sourceTextPlain}>
+                <Text style={styles.sourceTextLabel}>Source Link: </Text>
+                {sourceLink}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
-      );
-    }
+        {showAdAfter && <AdMobJobCard />}
+      </View>
+    );
+  }
 
     // Standard layout for private jobs
     return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={[
-          styles.premiumCard,
-          item.status === 'Expired' && { opacity: 0.6 },
-          item.isTopVisibility && { borderColor: '#bfdbfe', backgroundColor: '#fafcff' }
-        ]}
-        onPress={() => handleJobPress(item)}
-      >
+      <View key={item.id || index}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[
+            styles.premiumCard,
+            item.status === 'Expired' && { opacity: 0.6 },
+            item.isTopVisibility && { borderColor: '#bfdbfe', backgroundColor: '#fafcff' }
+          ]}
+          onPress={() => handleJobPress(item)}
+        >
         {/* Top visibility status indicator */}
         {item.isTopVisibility && (
           <View style={styles.topVisIndicator}>
@@ -741,8 +780,10 @@ export default function JobsListScreen({ route, navigation }: any) {
           </View>
         </View>
       </TouchableOpacity>
-    );
-  };
+      {showAdAfter && <AdMobJobCard />}
+    </View>
+  );
+};
 
   const getActiveFilterCount = () => {
     let count = 0;
@@ -1568,7 +1609,7 @@ const styles = StyleSheet.create({
   actionButtonsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 12,
   },
   whatsappActionButton: {
     flex: 1,
@@ -1586,11 +1627,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   socialMediaJobTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 10,
+    color: '#0F172A',
+    marginTop: 4,
+    marginBottom: 8,
     lineHeight: 22,
+  },
+  socialMediaJobDescription: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  sourceTextContainer: {
+    marginTop: 6,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
+  sourceTextLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+    textDecorationLine: 'none',
+  },
+  sourceTextPlain: {
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 19,
+    textDecorationLine: 'none',
   },
   scrollIndicator: {
     flexDirection: 'row',

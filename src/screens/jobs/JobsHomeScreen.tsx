@@ -30,6 +30,7 @@ import { Modal, KeyboardAvoidingView, TextInput } from 'react-native';
 import JobsSidebar from '../../components/JobsSidebar';
 import GradientHeader from '../../components/GradientHeader';
 import PremiumLockModal from '../../components/PremiumLockModal';
+import AdMobJobCard from '../../components/ads/AdMobJobCard';
 
 const { width } = Dimensions.get('window');
 
@@ -69,7 +70,7 @@ const JobsHomeScreen = ({ navigation }: any) => {
 
   const handleJobPress = (clickedJob: any) => {
     const isPremium = seekerPlanActive && seekerPlanExpiry && (seekerPlanExpiry.toDate ? seekerPlanExpiry.toDate() : new Date(seekerPlanExpiry)) > new Date();
-    
+
     const isSalaryOver20k = () => {
       if (!clickedJob) return false;
       if (clickedJob.isPremiumJobSeekerOnly === true || clickedJob.requiresPremium === true) return true;
@@ -751,7 +752,7 @@ const JobsHomeScreen = ({ navigation }: any) => {
               </ScrollView>
 
               {/* Government Non-Affiliation Disclaimer Banner */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.homeGovtDisclaimerBox}
                 onPress={() => navigation.navigate('GovtJobInfo')}
                 activeOpacity={0.8}
@@ -855,19 +856,20 @@ const JobsHomeScreen = ({ navigation }: any) => {
                   <Text style={styles.emptyStateText}>{t('home.no_jobs')}</Text>
                 </View>
               ) : (
-                jobs.map((job) => {
+                jobs.map((job, index) => {
                   const badge = getStatusBadge(job.status);
+                  const showAdAfter = (index + 1) % 4 === 0;
                   return (
-                    <TouchableOpacity
-                      key={job.id}
-                      activeOpacity={0.8}
-                      style={[
-                        styles.premiumCard,
-                        job.status === 'Expired' && { opacity: 0.6 },
-                        job.isTopVisibility && { borderColor: '#bfdbfe', backgroundColor: '#fafcff' }
-                      ]}
-                      onPress={() => handleJobPress(job)}
-                    >
+                    <View key={job.id || index}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.premiumCard,
+                          job.status === 'Expired' && { opacity: 0.6 },
+                          job.isTopVisibility && { borderColor: '#bfdbfe', backgroundColor: '#fafcff' }
+                        ]}
+                        onPress={() => handleJobPress(job)}
+                      >
                       {/* Top visibility status indicator */}
                       {job.isTopVisibility && (
                         <View style={styles.topVisIndicator}>
@@ -994,6 +996,8 @@ const JobsHomeScreen = ({ navigation }: any) => {
                         </View>
                       </View>
                     </TouchableOpacity>
+                    {showAdAfter && <AdMobJobCard />}
+                  </View>
                   );
                 })
               )}
@@ -1031,7 +1035,6 @@ const JobsHomeScreen = ({ navigation }: any) => {
                     <Text style={styles.premiumSeekerBenefitText}>{t('home.show_more')}</Text>
                   </View>
                 </View>
-
                 <TouchableOpacity
                   style={styles.premiumSeekerBtn}
                   onPress={() => navigation.navigate('UpgradeSeeker')}

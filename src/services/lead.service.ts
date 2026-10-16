@@ -83,6 +83,8 @@ class LeadService {
         message,
         body: message,
         type,
+        module: 'services',
+        isService: true,
         screen: 'MyLeads',
         read: false,
         createdAt: nowIso,

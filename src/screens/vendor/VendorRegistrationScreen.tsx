@@ -536,13 +536,18 @@ export default function VendorRegistrationScreen({ navigation, route }: any) {
         vendorData.createdAt = serverTimestamp();
         vendorData.publiclyVisible = false;
         
-        // New registered business defaults (requires verification & paid plan)
+        // New registered business defaults (requires verification & manual plan activation)
         vendorData.planExpiry = null;
         vendorData.planStartDate = null;
         vendorData.planUpdatedAt = null;
         vendorData.planId = null;
+        vendorData.plan = 'none';
+        vendorData.planBundle = null;
+        vendorData.subscriptionStatus = 'inactive';
         vendorData.tookVerification = false;
         vendorData.isVerified = false;
+        vendorData.verifyMark = false;
+        vendorData.verificationStatus = 'unverified';
 
         const businessRef = doc(collection(db, 'vendors'));
         await setDoc(businessRef, vendorData);
@@ -569,7 +574,8 @@ export default function VendorRegistrationScreen({ navigation, route }: any) {
           const { default: ns } = require('../../services/notification.service');
           ns.sendLocalNotification(
             'Business Details Submitted 📋',
-            `Your business details for "${businessName}" have been successfully submitted and are under review.`
+            `Your business details for "${businessName}" have been successfully submitted and are under review.`,
+            { module: 'services', isService: true, screen: 'ServicesHome' }
           );
         } catch (e) {
           console.log('Error triggering local notification:', e);

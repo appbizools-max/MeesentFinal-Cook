@@ -42,7 +42,14 @@
     "plugins": [
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-6882525720998233~4642776918",
+          "iosAppId": "ca-app-pub-6882525720998233~4642776918"
+        }
+      ]
     ],
     "extra": {
       "eas": {
@@ -50,5 +57,9 @@
       }
     },
     "owner": "preetham.avala"
+  },
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-6882525720998233~4642776918",
+    "ios_app_id": "ca-app-pub-6882525720998233~4642776918"
   }
 }

@@ -101,7 +101,9 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"
+                arguments "-DANDROID_STL=c++_shared",
+                          "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384 -lc++_shared",
+                          "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"
             }
         }
 
